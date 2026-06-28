@@ -1,0 +1,433 @@
+.historyShell {
+  min-height: 100vh;
+  padding: 24px var(--page-gutter) 44px;
+  background: var(--paper-grid);
+  background-size: 28px 28px;
+  color: var(--paper-ink);
+}
+
+.historyShell .primary {
+  min-height: 40px;
+  border-radius: 8px;
+}
+
+.historyToast {
+  position: fixed;
+  top: 24px;
+  right: 28px;
+  z-index: 32;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  max-width: min(360px, calc(100vw - 32px));
+  min-height: 42px;
+  padding: 0 14px;
+  border: 1px solid rgba(40, 120, 92, 0.16);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.94);
+  box-shadow: 0 18px 44px rgba(47, 40, 65, 0.16);
+  color: #28785c;
+  font-size: 13px;
+  font-weight: 720;
+  backdrop-filter: blur(14px);
+  animation: historyToastIn 180ms ease-out both;
+}
+
+.historyToast.error {
+  border-color: rgba(159, 57, 64, 0.2);
+  color: #9f3940;
+}
+
+/* 历史页：列表扫描模式，保持窄帧便于快速浏览 */
+.historyList {
+  display: grid;
+  gap: 12px;
+  max-width: var(--page-frame-narrow);
+  margin: 0 auto;
+}
+
+.historyItem {
+  display: grid;
+  grid-template-columns: 92px minmax(0, 1fr) auto;
+  gap: 16px;
+  align-items: center;
+  padding: 14px;
+  border: 1px solid var(--paper-line);
+  border-left: 8px solid var(--paper-new);
+  border-radius: 8px;
+  background: rgba(255, 253, 247, 0.88);
+  box-shadow: 4px 4px 0 rgba(23, 32, 26, 0.08);
+}
+
+.historyThumb {
+  display: grid;
+  place-items: center;
+  width: 92px;
+  aspect-ratio: 1;
+  overflow: hidden;
+  border-radius: 8px;
+  background: #ece7dc;
+  color: var(--paper-muted);
+}
+
+.historyThumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.historyMain {
+  min-width: 0;
+}
+
+.historyTitleRow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 7px;
+}
+
+.historyTitleRow h2 {
+  min-width: 0;
+  margin: 0;
+  overflow: hidden;
+  font-size: 18px;
+  line-height: 1.3;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.historyMain p {
+  display: -webkit-box;
+  margin: 0 0 10px;
+  overflow: hidden;
+  color: var(--paper-muted);
+  line-height: 1.55;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.historyMeta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  color: var(--paper-muted);
+  font-size: 12px;
+}
+
+.historyMeta span,
+.historyStatus {
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
+  padding: 0 8px;
+  border: 1px solid rgba(23, 32, 26, 0.08);
+  border-radius: 8px;
+  background: rgba(23, 32, 26, 0.045);
+}
+
+.historyStatus {
+  flex: 0 0 auto;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.historyStatus.complete {
+  background: #eef8f1;
+  color: var(--paper-new);
+}
+
+.historyStatus.live {
+  background: #fff0df;
+  color: var(--paper-run);
+}
+
+.historyStatus.paused {
+  background: #e7f2f2;
+  color: var(--paper-identity);
+}
+
+.historyStatus.prep {
+  background: #eef2f7;
+  color: #566174;
+}
+
+.historyActions {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 8px;
+  min-width: 118px;
+}
+
+.historyActions .primary,
+.historyActions .ghostButton,
+.historyMore {
+  width: 100%;
+  margin: 0;
+}
+
+.dangerGhost {
+  color: #9f3940;
+}
+
+.dangerGhost:hover {
+  background: #f9e8ea;
+  color: #81272d;
+}
+
+.dangerGhost:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.historyDeleteOverlay {
+  background: rgba(29, 27, 38, 0.28);
+  backdrop-filter: blur(10px);
+}
+
+.historyDeleteDialog {
+  position: relative;
+  display: grid;
+  gap: 18px;
+  width: min(520px, calc(100vw - 32px));
+  padding: 28px;
+  border: 1px solid rgba(159, 57, 64, 0.18);
+  border-radius: 8px;
+  background:
+    linear-gradient(180deg, rgba(255, 250, 251, 0.98), rgba(255, 255, 255, 0.98)),
+    #fff;
+  box-shadow: 0 30px 90px rgba(35, 26, 55, 0.24);
+}
+
+.historyDeleteDialog .drawerClose {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border: 0;
+  border-radius: 50%;
+  background: #f4eef1;
+  color: #7a6570;
+  cursor: pointer;
+}
+
+.historyDeleteDialog .drawerClose:hover {
+  background: #eadce1;
+  color: #5f3038;
+}
+
+.historyDeleteHeader {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding-right: 44px;
+}
+
+.historyDeleteIcon {
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  width: 46px;
+  height: 46px;
+  border: 1px solid rgba(159, 57, 64, 0.18);
+  border-radius: 8px;
+  background: #fff0f2;
+  color: #9f3940;
+}
+
+.historyDeleteHeader span {
+  display: block;
+  margin-bottom: 3px;
+  color: #9f3940;
+  font-size: 12px;
+  font-weight: 760;
+}
+
+.historyDeleteDialog h2 {
+  margin: 0;
+  color: #282431;
+  font-size: 22px;
+  line-height: 1.25;
+}
+
+.historyDeleteDialog p {
+  margin: 0;
+  padding: 14px 16px;
+  border: 1px solid #f1d9de;
+  border-radius: 8px;
+  background: #fff7f8;
+  color: #665f72;
+  font-size: 14px;
+  line-height: 1.75;
+}
+
+.historyDeleteActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+}
+
+.historyDeleteActions .ghostButton {
+  width: auto;
+  min-width: 128px;
+  margin: 0;
+  background: #f2f1f8;
+}
+
+.dangerButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 40px;
+  min-width: 128px;
+  padding: 0 18px;
+  border: 0;
+  border-radius: 8px;
+  background: #9f3940;
+  color: #fff;
+  font-weight: 760;
+  cursor: pointer;
+}
+
+.dangerButton:hover:not(:disabled) {
+  background: #8a3038;
+  box-shadow: 3px 3px 0 rgba(159, 57, 64, 0.16);
+}
+
+.dangerButton:disabled {
+  cursor: not-allowed;
+  opacity: 0.72;
+}
+
+@keyframes historyToastIn {
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.historyEmpty {
+  position: relative;
+  display: grid;
+  place-items: center;
+  max-width: var(--page-frame-narrow);
+  min-height: min(560px, calc(100vh - 166px));
+  margin: 14px auto 0;
+  padding: 38px;
+  overflow: hidden;
+  border: 2px solid rgba(23, 32, 26, 0.78);
+  border-radius: 8px;
+  background:
+    linear-gradient(90deg, rgba(23, 32, 26, 0.035) 1px, transparent 1px),
+    linear-gradient(180deg, rgba(23, 32, 26, 0.035) 1px, transparent 1px),
+    rgba(255, 253, 247, 0.72);
+  background-size: 28px 28px, 28px 28px, auto;
+  color: var(--paper-muted);
+  text-align: center;
+}
+
+.historyEmpty::before,
+.historyEmpty::after {
+  position: absolute;
+  content: "";
+  pointer-events: none;
+}
+
+.historyEmpty::before {
+  inset: 0;
+  background:
+    linear-gradient(180deg, rgba(247, 244, 236, 0), rgba(247, 244, 236, 0.88)),
+    linear-gradient(90deg, transparent, rgba(75, 111, 68, 0.06), transparent);
+}
+
+.historyEmpty::after {
+  left: 50%;
+  bottom: 108px;
+  width: min(520px, calc(100% - 72px));
+  height: 1px;
+  transform: translateX(-50%);
+  background: linear-gradient(90deg, transparent, rgba(95, 106, 124, 0.28), transparent);
+}
+
+.historyEmptyPanel {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  justify-items: center;
+  gap: 14px;
+  max-width: 360px;
+  padding: 8px 0;
+}
+
+.historyEmptyIcon {
+  display: grid;
+  place-items: center;
+  width: 54px;
+  height: 54px;
+  border-radius: 8px;
+  border: 1px solid var(--paper-line);
+  background: var(--paper-panel-strong);
+  color: var(--paper-new);
+  box-shadow: 3px 3px 0 rgba(23, 32, 26, 0.08);
+}
+
+.historyEmptyCopy {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.historyEmpty h2 {
+  margin: 0;
+  color: var(--paper-ink);
+  font-size: 18px;
+  line-height: 1.3;
+}
+
+.historyEmpty p {
+  margin: 0;
+  color: var(--paper-muted);
+  font-size: 13px;
+}
+
+.historyEmptyAction {
+  width: auto;
+  min-width: 128px;
+  margin: 2px 0 0;
+  padding: 0 18px;
+}
+
+.historyMore {
+  display: flex;
+  max-width: var(--page-frame-narrow);
+  margin: 14px auto 0;
+}
+
+@media (max-width: 720px) {
+  .historyShell {
+    padding-top: 16px;
+    padding-bottom: 32px;
+  }
+
+  .historyEmpty {
+    grid-template-columns: 1fr;
+    max-width: none;
+    min-height: 330px;
+    margin: 12px auto 0;
+    padding: 28px 18px;
+    background-size: 44px 44px, 44px 44px, auto;
+  }
+
+  .historyEmptyAction {
+    width: 100%;
+  }
+}

@@ -1,0 +1,738 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>TryCue 报告生成链路可视化</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --ink: #181714;
+      --muted: #69655d;
+      --line: #d8d2c6;
+      --paper: #f7f2e8;
+      --panel: #fffaf1;
+      --black: #111111;
+      --red: #d6402f;
+      --amber: #d58d19;
+      --green: #197b55;
+      --blue: #265d9c;
+      --violet: #6650a4;
+      --shadow: 0 18px 50px rgba(24, 23, 20, .12);
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      color: var(--ink);
+      background:
+        linear-gradient(90deg, rgba(24, 23, 20, .04) 1px, transparent 1px) 0 0 / 24px 24px,
+        linear-gradient(180deg, rgba(24, 23, 20, .04) 1px, transparent 1px) 0 0 / 24px 24px,
+        var(--paper);
+      font-family: "Microsoft YaHei", "Noto Sans CJK SC", "PingFang SC", sans-serif;
+    }
+
+    a {
+      color: inherit;
+    }
+
+    .page {
+      width: min(1440px, calc(100vw - 36px));
+      margin: 0 auto;
+      padding: 28px 0 48px;
+    }
+
+    .top {
+      display: grid;
+      grid-template-columns: minmax(0, 1.2fr) minmax(320px, .8fr);
+      gap: 18px;
+      align-items: stretch;
+      min-height: 248px;
+    }
+
+    .titleBlock,
+    .verdict,
+    .panel,
+    .issue,
+    .legend,
+    .stage,
+    .track {
+      border: 1px solid var(--black);
+      background: var(--panel);
+      box-shadow: var(--shadow);
+    }
+
+    .titleBlock {
+      padding: 28px;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .titleBlock::after {
+      content: "";
+      position: absolute;
+      inset: auto -40px -80px auto;
+      width: 240px;
+      height: 240px;
+      border: 1px solid var(--black);
+      transform: rotate(18deg);
+      background: repeating-linear-gradient(135deg, rgba(214, 64, 47, .16), rgba(214, 64, 47, .16) 8px, transparent 8px, transparent 18px);
+    }
+
+    .kicker {
+      margin: 0 0 18px;
+      font-size: 12px;
+      font-weight: 800;
+      letter-spacing: 0;
+      text-transform: uppercase;
+      color: var(--red);
+    }
+
+    h1 {
+      max-width: 900px;
+      margin: 0;
+      font-family: Georgia, "Times New Roman", serif;
+      font-size: clamp(40px, 5.4vw, 72px);
+      line-height: 1.02;
+      letter-spacing: 0;
+    }
+
+    .subtitle {
+      max-width: 760px;
+      margin: 22px 0 0;
+      color: var(--muted);
+      font-size: 17px;
+      line-height: 1.7;
+    }
+
+    .verdict {
+      padding: 22px;
+      display: grid;
+      align-content: space-between;
+      background: #151515;
+      color: #fff7e8;
+    }
+
+    .verdict h2 {
+      margin: 0;
+      font-size: 24px;
+    }
+
+    .verdict p {
+      margin: 14px 0 0;
+      color: #e5dccb;
+      line-height: 1.65;
+    }
+
+    .scoreGrid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 10px;
+      margin-top: 20px;
+    }
+
+    .score {
+      min-height: 90px;
+      padding: 12px;
+      border: 1px solid rgba(255, 247, 232, .35);
+      display: grid;
+      align-content: space-between;
+    }
+
+    .score span {
+      font-size: 12px;
+      color: #c9bfad;
+    }
+
+    .score strong {
+      font-size: 28px;
+      line-height: 1;
+    }
+
+    .sectionTitle {
+      display: flex;
+      align-items: end;
+      justify-content: space-between;
+      gap: 18px;
+      margin: 34px 0 14px;
+    }
+
+    .sectionTitle h2 {
+      margin: 0;
+      font-family: Georgia, "Times New Roman", serif;
+      font-size: 38px;
+      letter-spacing: 0;
+    }
+
+    .sectionTitle p {
+      margin: 0;
+      color: var(--muted);
+      line-height: 1.6;
+    }
+
+    .flow {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 12px;
+      align-items: stretch;
+    }
+
+    .stage {
+      min-height: 216px;
+      padding: 16px;
+      position: relative;
+      display: grid;
+      grid-template-rows: auto auto 1fr auto;
+      gap: 10px;
+    }
+
+    .stage::before {
+      content: attr(data-step);
+      width: 34px;
+      height: 34px;
+      border: 1px solid var(--black);
+      background: var(--black);
+      color: var(--panel);
+      display: grid;
+      place-items: center;
+      font-weight: 800;
+    }
+
+    .stage h3 {
+      margin: 0;
+      font-size: 18px;
+      line-height: 1.28;
+    }
+
+    .stage p {
+      margin: 0;
+      color: var(--muted);
+      line-height: 1.58;
+      font-size: 14px;
+      overflow-wrap: anywhere;
+    }
+
+    .tag {
+      display: inline-flex;
+      align-items: center;
+      width: fit-content;
+      min-height: 28px;
+      padding: 5px 8px;
+      border: 1px solid currentColor;
+      font-size: 12px;
+      font-weight: 800;
+    }
+
+    .auto {
+      color: var(--blue);
+    }
+
+    .manual {
+      color: var(--violet);
+    }
+
+    .persist {
+      color: var(--green);
+    }
+
+    .problem {
+      color: var(--red);
+    }
+
+    .tracks {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 14px;
+    }
+
+    .track {
+      padding: 18px;
+    }
+
+    .track h3 {
+      margin: 0 0 12px;
+      font-size: 20px;
+    }
+
+    .rail {
+      display: grid;
+      gap: 9px;
+    }
+
+    .railItem {
+      display: grid;
+      grid-template-columns: 112px 1fr;
+      gap: 12px;
+      align-items: start;
+      padding: 10px;
+      border: 1px solid var(--line);
+      background: #fffdf7;
+    }
+
+    .railItem b {
+      font-size: 13px;
+    }
+
+    .railItem span {
+      color: var(--muted);
+      line-height: 1.48;
+      font-size: 13px;
+    }
+
+    .issueGrid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 14px;
+    }
+
+    .issue {
+      min-height: 250px;
+      padding: 18px;
+      display: grid;
+      grid-template-rows: auto auto 1fr auto;
+      gap: 12px;
+      background: #fffdf7;
+    }
+
+    .issue header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+    }
+
+    .issue h3 {
+      margin: 0;
+      font-size: 19px;
+      line-height: 1.25;
+    }
+
+    .priority {
+      flex: 0 0 auto;
+      width: 42px;
+      height: 42px;
+      display: grid;
+      place-items: center;
+      border: 1px solid var(--black);
+      font-weight: 900;
+      background: var(--paper);
+    }
+
+    .p0 {
+      background: var(--red);
+      color: #fff;
+    }
+
+    .p1 {
+      background: var(--amber);
+      color: #111;
+    }
+
+    .p2 {
+      background: #f6e1a6;
+      color: #111;
+    }
+
+    .issue p {
+      margin: 0;
+      color: var(--muted);
+      line-height: 1.62;
+      font-size: 14px;
+    }
+
+    .evidence {
+      padding: 10px;
+      border-left: 4px solid currentColor;
+      background: var(--paper);
+      color: var(--ink);
+      font-size: 12px;
+      line-height: 1.5;
+    }
+
+    .fix {
+      display: grid;
+      gap: 6px;
+      padding-top: 12px;
+      border-top: 1px solid var(--line);
+    }
+
+    .fix b {
+      font-size: 12px;
+      color: var(--green);
+    }
+
+    .fix span {
+      color: var(--ink);
+      line-height: 1.5;
+      font-size: 13px;
+    }
+
+    .matrix {
+      display: grid;
+      grid-template-columns: 240px repeat(4, 1fr);
+      border: 1px solid var(--black);
+      background: var(--black);
+      gap: 1px;
+      box-shadow: var(--shadow);
+    }
+
+    .cell {
+      min-height: 76px;
+      padding: 12px;
+      background: #fffdf7;
+      display: grid;
+      align-content: center;
+      gap: 4px;
+      font-size: 13px;
+      line-height: 1.35;
+    }
+
+    .cell.head {
+      background: #151515;
+      color: #fff7e8;
+      font-weight: 900;
+    }
+
+    .cell.good {
+      background: #e5f3df;
+    }
+
+    .cell.warn {
+      background: #fff1c9;
+    }
+
+    .cell.bad {
+      background: #ffe3df;
+    }
+
+    .legend {
+      margin-top: 14px;
+      padding: 14px 16px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px 18px;
+      color: var(--muted);
+      line-height: 1.5;
+      box-shadow: none;
+    }
+
+    .legend b {
+      color: var(--ink);
+    }
+
+    .footer {
+      margin-top: 28px;
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.6;
+    }
+
+    @media (max-width: 1180px) {
+      .issueGrid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+
+      .top,
+      .tracks {
+        grid-template-columns: 1fr;
+      }
+
+      .matrix {
+        grid-template-columns: 180px repeat(4, minmax(160px, 1fr));
+        overflow-x: auto;
+      }
+    }
+
+    @media (max-width: 720px) {
+      .page {
+        width: min(100vw - 22px, 1440px);
+        padding-top: 12px;
+      }
+
+      h1 {
+        font-size: 44px;
+      }
+
+      .flow,
+      .issueGrid {
+        grid-template-columns: 1fr;
+      }
+
+      .sectionTitle {
+        display: grid;
+      }
+
+      .scoreGrid {
+        grid-template-columns: 1fr;
+      }
+
+      .railItem {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main class="page">
+    <section class="top">
+      <div class="titleBlock">
+        <p class="kicker">TryCue Runtime Report Map</p>
+        <h1>报告生成不是一个页面，它是一条证据流水线。</h1>
+        <p class="subtitle">当前实现的主路径已经能完成报告落库和展示；真正的问题在证据完整性、LLM 输出可靠性、证据链可追溯和超时控制。</p>
+      </div>
+      <aside class="verdict">
+        <div>
+          <p class="kicker">Current judgement</p>
+          <h2>能用作 MVP 演示，但还不能算高质量研究报告。</h2>
+          <p>它现在更像“基于部分事实的总结器”：计数、评论和 action log 已接入；tool call、social event、insight、source breakdown 和可验证 evidence chain 还没有真正闭环。</p>
+        </div>
+        <div class="scoreGrid">
+          <div class="score"><span>链路完整</span><strong>7/10</strong></div>
+          <div class="score"><span>证据完整</span><strong>4/10</strong></div>
+          <div class="score"><span>失败可控</span><strong>5/10</strong></div>
+        </div>
+      </aside>
+    </section>
+
+    <section>
+      <div class="sectionTitle">
+        <h2>实际生成链路</h2>
+        <p>蓝色是自动完成路径，紫色是暂停后手动生成路径，绿色是持久化边界。</p>
+      </div>
+      <div class="flow">
+        <article class="stage" data-step="1">
+          <span class="tag auto">AUTO</span>
+          <h3>Scheduler 判断试映自然结束</h3>
+          <p>没有 active journey，也没有 pending / running action 后调用 `generateReportAndCompleteRun()`。</p>
+          <span class="tag">scheduler.ts:102</span>
+        </article>
+        <article class="stage" data-step="2">
+          <span class="tag manual">MANUAL</span>
+          <h3>暂停后手动结束</h3>
+          <p>前端在 paused 状态 POST `/api/runs/:runId/report`，后端允许生成阶段报告。</p>
+          <span class="tag">app.ts:537</span>
+        </article>
+        <article class="stage" data-step="3">
+          <span class="tag">INPUT</span>
+          <h3>收集当前证据</h3>
+          <p>读取 contentVersion、postState、journeys、comments、actionLogs 最近 200 条、runParticipants。</p>
+          <span class="tag">report.ts:31</span>
+        </article>
+        <article class="stage" data-step="4">
+          <span class="tag">BRANCH</span>
+          <h3>选择 real 或 mock</h3>
+          <p>real 模式调用 OpenAI-compatible Chat Completions；mock 模式走本地规则报告。</p>
+          <span class="tag">report.ts:61</span>
+        </article>
+        <article class="stage" data-step="5">
+          <span class="tag persist">SAVE</span>
+          <h3>upsert 报告</h3>
+          <p>按 runId 写入 reports，一次 run 最多一份报告；reportId 只是内部调试 ID。</p>
+          <span class="tag">schema.prisma:816</span>
+        </article>
+        <article class="stage" data-step="6">
+          <span class="tag persist">DONE</span>
+          <h3>完成 run 并推送事件</h3>
+          <p>post phase 变 completed，run 变 completed，并推送 `run.completed`。</p>
+          <span class="tag">report.ts:134</span>
+        </article>
+      </div>
+    </section>
+
+    <section>
+      <div class="sectionTitle">
+        <h2>两条生成轨道</h2>
+        <p>real 轨道依赖模型结构化输出；fallback 轨道是关键词和计数规则。</p>
+      </div>
+      <div class="tracks">
+        <article class="track">
+          <h3>Real LLM 轨道</h3>
+          <div class="rail">
+            <div class="railItem"><b>配置门槛</b><span>`runtimeMode=real` 且 baseUrl、apiKey、audience model、report model 完整。</span></div>
+            <div class="railItem"><b>输入内容</b><span>标题、正文、postState、journey 概况、观众列表、action logs 文本、comments 文本、图片 URL。</span></div>
+            <div class="railItem"><b>模型要求</b><span>系统 prompt 要求只输出 JSON，包含 recommendation、summary、dimensions、commentPreview、risks、revisionSuggestions、evidenceIndex。</span></div>
+            <div class="railItem"><b>失败处理</b><span>SDK 抛错时暂停 run，写 errorMessage，推送 `run.paused`，不会降级成 mock 报告。</span></div>
+          </div>
+        </article>
+        <article class="track">
+          <h3>Mock / fallback 轨道</h3>
+          <div class="rail">
+            <div class="railItem"><b>推荐规则</b><span>打开人数不足半数则不推荐；否则有信任质疑则修改后发布；否则推荐发布。</span></div>
+            <div class="railItem"><b>维度分析</b><span>根据打开、收藏、评论计数和关键词生成 firstImpression、trust、value、interactionIntent、risks。</span></div>
+            <div class="railItem"><b>评论预演</b><span>按“吗 / 求 / 价格 / 广告 / 码住”等关键词把评论分到 question、doubt、resonance。</span></div>
+            <div class="railItem"><b>证据索引</b><span>简单把前 20 条 log 和 comment 的文本截断成 claim，再挂原始 id。</span></div>
+          </div>
+        </article>
+      </div>
+    </section>
+
+    <section>
+      <div class="sectionTitle">
+        <h2>文档要求 vs 当前实现</h2>
+        <p>这里是最直观的差距：不是“没有报告”，而是报告的证据底座还不够完整。</p>
+      </div>
+      <div class="matrix">
+        <div class="cell head">能力 / 证据</div>
+        <div class="cell head">文档要求</div>
+        <div class="cell head">当前实现</div>
+        <div class="cell head">风险</div>
+        <div class="cell head">判断</div>
+
+        <div class="cell head">基础计数</div>
+        <div class="cell">simulated_post_state、journeys、comments</div>
+        <div class="cell good">已接入 `buildSummaryView()`</div>
+        <div class="cell">主要是口径准确性问题</div>
+        <div class="cell good">基本可用</div>
+
+        <div class="cell head">行为证据</div>
+        <div class="cell">journey_steps、journey_tool_calls、action_logs</div>
+        <div class="cell warn">只显式使用 journeys 和 action_logs；tool calls 未进入 prompt</div>
+        <div class="cell">无法复核每个工具动作和报告结论的关系</div>
+        <div class="cell warn">缺口明显</div>
+
+        <div class="cell head">社交证据</div>
+        <div class="cell">social_interaction_events、social_reactions、source breakdown</div>
+        <div class="cell bad">报告生成未查询这些表</div>
+        <div class="cell">前端用户行为和 Agent 行为无法拆分解释</div>
+        <div class="cell bad">未达标</div>
+
+        <div class="cell head">洞察证据</div>
+        <div class="cell">insights 及相关证据链</div>
+        <div class="cell bad">报告生成未读取 insights</div>
+        <div class="cell">现场洞察和最终报告可能断裂</div>
+        <div class="cell bad">未达标</div>
+
+        <div class="cell head">输出可靠性</div>
+        <div class="cell">结构化报告字段完整</div>
+        <div class="cell warn">JSON 解析失败会变成空对象；没有 schema 校验</div>
+        <div class="cell">real 模式可能生成“成功但空洞”的报告</div>
+        <div class="cell bad">高风险</div>
+      </div>
+    </section>
+
+    <section>
+      <div class="sectionTitle">
+        <h2>当前问题清单</h2>
+        <p>按对报告可信度和用户决策风险排序。</p>
+      </div>
+      <div class="issueGrid">
+        <article class="issue">
+          <header>
+            <h3>Real 输出没有 schema 校验</h3>
+            <span class="priority p0">P0</span>
+          </header>
+          <p>模型输出只做 JSON.parse，解析失败会返回空对象；字段类型错误也会被直接写库。</p>
+          <div class="evidence problem">证据：`reportAgent.ts:107-123` 捕获 parse 失败后 `parsed = {}`，然后给空 sections 默认值。</div>
+          <div class="fix"><b>修复方向</b><span>用 shared DTO / zod 校验报告结构；real 模式结构不合格应进入 REPORT_GENERATION_FAILED，不应写成功报告。</span></div>
+        </article>
+
+        <article class="issue">
+          <header>
+            <h3>证据输入少于文档要求</h3>
+            <span class="priority p0">P0</span>
+          </header>
+          <p>文档要求 tool calls、social events、social reactions、insights、source breakdown；当前报告只取了部分数据。</p>
+          <div class="evidence problem">证据：`report.ts:36-39` 只查询 journeys / comments / actionLogs / audiences；`docs/08_Report_Generation_Spec.md:29-51` 要求更多输入。</div>
+          <div class="fix"><b>修复方向</b><span>建立 report evidence builder，把所有报告证据统一抽成结构化输入，再同时供 real 和 fallback 使用。</span></div>
+        </article>
+
+        <article class="issue">
+          <header>
+            <h3>证据索引不可真正验证</h3>
+            <span class="priority p1">P1</span>
+          </header>
+          <p>fallback 的 evidenceIndex 是文本截断；real prompt 只给日志和评论文本，没有明确 id 列表让模型引用。</p>
+          <div class="evidence problem">证据：`buildEvidenceIndex()` 用 `slice(0, 40)` 生成 claim；`reportAgent.ts:61-79` prompt 拼的是纯文本。</div>
+          <div class="fix"><b>修复方向</b><span>给模型输入 `{id,type,text,participant,source,simulatedTime}`；输出只能引用已有 id，落库前校验 evidenceRefs 存在。</span></div>
+        </article>
+
+        <article class="issue">
+          <header>
+            <h3>报告生成超时没有显式控制</h3>
+            <span class="priority p1">P1</span>
+          </header>
+          <p>文档写 Report 生成超时 180 秒，但当前 LLM 调用没有独立 AbortController 或 timeout 参数。</p>
+          <div class="evidence problem">证据：`docs/04_Runtime_Scheduler_Runner_Design.md:603-608` 定义 180 秒；`reportAgent.ts:99-106` 直接等待 SDK。</div>
+          <div class="fix"><b>修复方向</b><span>给报告模型调用加 180 秒超时；超时后走统一 REPORT_GENERATION_FAILED 暂停流程。</span></div>
+        </article>
+
+        <article class="issue">
+          <header>
+            <h3>前端不展示 evidenceIndex</h3>
+            <span class="priority p1">P1</span>
+          </header>
+          <p>API 返回 evidenceIndex，但前端类型和 ReportPanel 都没有展示；用户看不到“结论来自哪些行为”。</p>
+          <div class="evidence problem">证据：`views.ts:91` 返回 evidenceIndex；`apps/web/src/types.ts:141-150` 没有 evidenceIndex 字段；`ReportPanel.tsx` 不渲染证据索引。</div>
+          <div class="fix"><b>修复方向</b><span>在报告页加证据链区域；支持按结论展开相关 action/comment/tool call。</span></div>
+        </article>
+
+        <article class="issue">
+          <header>
+            <h3>fallback 文案会放大证据</h3>
+            <span class="priority p2">P2</span>
+          </header>
+          <p>只要有一条信任质疑评论，就可能输出“多位观众追问”；这会让报告显得比事实更严重。</p>
+          <div class="evidence problem">证据：`buildFallbackReport()` 对 `trustComments.length` 只判断是否大于 0。</div>
+          <div class="fix"><b>修复方向</b><span>把数量、比例、来源拆分写进文案生成规则；避免“多位”“集中”等没有阈值支撑的措辞。</span></div>
+        </article>
+      </div>
+    </section>
+
+    <section>
+      <div class="sectionTitle">
+        <h2>建议修复顺序</h2>
+        <p>先保护报告可信度，再扩大报告深度。</p>
+      </div>
+      <div class="flow">
+        <article class="stage" data-step="A">
+          <span class="tag problem">FIRST</span>
+          <h3>定义 Report DTO + zod schema</h3>
+          <p>把 report 输出结构放入 shared，API、agent、前端都用同一个契约。</p>
+          <span class="tag">可信度底线</span>
+        </article>
+        <article class="stage" data-step="B">
+          <span class="tag problem">FIRST</span>
+          <h3>real 输出校验失败即失败</h3>
+          <p>不允许空对象、错类型、非法 recommendation 被写入 completed 报告。</p>
+          <span class="tag">防假成功</span>
+        </article>
+        <article class="stage" data-step="C">
+          <span class="tag">NEXT</span>
+          <h3>抽象 evidence builder</h3>
+          <p>统一收集 action logs、tool calls、social events、reactions、insights、source breakdown。</p>
+          <span class="tag">补证据底座</span>
+        </article>
+        <article class="stage" data-step="D">
+          <span class="tag">NEXT</span>
+          <h3>校验 evidenceRefs</h3>
+          <p>模型只能引用输入集合里存在的 id；不允许凭空造证据。</p>
+          <span class="tag">可追溯</span>
+        </article>
+        <article class="stage" data-step="E">
+          <span class="tag">NEXT</span>
+          <h3>报告页展示证据链</h3>
+          <p>每个 judgement 可展开原始评论、动作、观众和来源。</p>
+          <span class="tag">用户可审计</span>
+        </article>
+        <article class="stage" data-step="F">
+          <span class="tag">THEN</span>
+          <h3>优化 fallback 规则</h3>
+          <p>让 mock 报告也遵守数量阈值、来源拆分和事实措辞。</p>
+          <span class="tag">演示质量</span>
+        </article>
+      </div>
+    </section>
+
+    <div class="legend">
+      <span><b>事实来源：</b>当前仓库代码和文档。</span>
+      <span><b>不确定性：</b>没有实际跑一条 real 模型报告；这里分析的是实现路径和静态证据。</span>
+      <span><b>核心判断：</b>先修“假成功”和“证据不可追溯”，再追求报告内容更聪明。</span>
+    </div>
+
+    <p class="footer">本页是辅助理解页面，不是产品运行页面。文件位置：docs/report-generation-flow.html</p>
+  </main>
+</body>
+</html>

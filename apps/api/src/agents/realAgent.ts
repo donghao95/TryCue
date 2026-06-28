@@ -1,0 +1,1341 @@
+import { createOpenAICompatible } from "@ai-sdk/openai-compatible";
+import { generateText, parsePartialJson, stepCountIs, streamText } from "ai";
+import { getSharedCapacityManager, getSharedRateLimitedFetch } from "../llm/rateLimitedFetch.js";
+import { aiSdkTrace } from "../llm/aiSdkTracing.js";
+import { log } from "../logger.js";
+import {
+  AudiencePlanFrameSchema,
+  AudienceProfileExpansionFrameSchema,
+  AudienceSamplingPlanRevisionProposalSchema,
+  AudienceSeatRevisionProposalSchema,
+  MBTI_TYPES,
+  type AudienceGenerationProgressView,
+  type AudiencePlanFrame,
+  type AudiencePlanPreview,
+  type AudiencePlanPreviewDirective,
+  type AudiencePlanPreviewDirectiveStatus,
+  type AudiencePlanProgressEvent,
+  type AudienceProfileExpansionFrame,
+  type AudienceSamplingPlanRevisionMessage,
+  type AudienceSamplingPlanRevisionProposal,
+  type AudienceSeatRevisionMessage,
+  type AudienceSeatRevisionProposal
+} from "@trycue/shared";
+import type { LlmRuntimeConfig } from "../llmConfigStore.js";
+import { validateRealLlmConfig } from "../llmConfigStore.js";
+import type {
+  AgentProvider,
+  ParsedToolCall,
+  RunParticipantContext,
+  AudienceProfilePlan,
+  AudienceSamplingDirectiveDraft,
+  AudienceSamplingDirectiveView,
+  AudienceSamplingPlanDraft,
+  AudienceSamplingPlanViewForProvider,
+  GeneratedAudience,
+  LlmTraceContext
+} from "./types.js";
+import { modelForAiTask, type AiTaskType } from "./taskRunner.js";
+import {
+  completeAiSdkStepAndPrepareNext,
+  createAiSdkToolRuntimeContext,
+  createAiSdkToolSet,
+  persistStep
+} from "../tools/toolExecutor.js";
+
+const TEMPERATURE_CREATIVE = 0.9;
+const TEMPERATURE_BALANCED = 0.8;
+const TEMPERATURE_PRECISE = 0.45;
+
+import {
+  PROMPT_VERSION_AUDIENCE_PLAN,
+  PROMPT_VERSION_AUDIENCE_PERSONA,
+  PROMPT_VERSION_PROFILE_EXPANSION,
+  PROMPT_VERSION_SAMPLING_PLAN_REVISION,
+  PROMPT_VERSION_SEAT_REVISION,
+  PROMPT_VERSION_AGENT
+} from "./promptVersions.js";
+import { DEFAULT_PLATFORM_NAME } from "@trycue/shared";
+
+export class RealAgentProvider implements AgentProvider {
+  private readonly aiSdkOpenaiCompatible: ReturnType<typeof createOpenAICompatible>;
+  private readonly platformName: string;
+
+  constructor(private readonly config: LlmRuntimeConfig, options?: { platformName?: string }) {
+    const configError = validateRealLlmConfig(config);
+    if (configError) throw new Error(configError);
+    const rateLimitedFetch = getSharedRateLimitedFetch();
+    this.aiSdkOpenaiCompatible = createOpenAICompatible({
+      name: "trycue-openai-compatible",
+      apiKey: config.apiKey!,
+      baseURL: config.baseUrl!,
+      includeUsage: true,
+      fetch: rateLimitedFetch
+    });
+    this.platformName = options?.platformName ?? DEFAULT_PLATFORM_NAME;
+  }
+
+  private modelForTask(type: AiTaskType) {
+    return modelForAiTask(this.config, type);
+  }
+
+  async generateAudienceSamplingPlan(input: {
+    title: string;
+    coverImageUrl: string;
+    imageUrls: string[];
+    bodyText: string;
+    count: number;
+    onReasoningDelta?: (delta: string, meta?: { tokens?: number; tokenEstimate?: number }) => void | Promise<void>;
+    onProgress?: (event: AudiencePlanProgressEvent) => void | Promise<void>;
+    onFrame?: (frame: AudiencePlanFrame, preview: AudiencePlanPreview) => void | Promise<void>;
+    trace?: LlmTraceContext;
+  }): Promise<AudienceSamplingPlanDraft> {
+    const seenProgress = new Set<string>();
+    const emitProgress = async (event: AudiencePlanProgressEvent) => {
+      const key = [
+        event.stage,
+        event.directiveCount ?? "",
+        event.quantityTotal ?? "",
+        event.detail ?? ""
+      ].join(":");
+      if (seenProgress.has(key)) return;
+      seenProgress.add(key);
+      await input.onProgress?.(event);
+    };
+    await emitProgress({
+      stage: "model_request",
+      label: "正在请求观众规划模型",
+      detail: `目标 ${input.count} 位观众，纳入 ${input.imageUrls.length} 张图片。`,
+      targetCount: input.count
+    });
+
+    const modelName = this.modelForTask("audience_plan");
+    const platformName = this.platformName;
+    const result = streamText({
+      model: this.aiSdkOpenaiCompatible.chatModel(modelName),
+      system: buildSamplingPlanSystemPrompt(platformName),
+      messages: [
+        {
+          role: "user",
+          content: [
+            {
+              type: "text",
+              text: `请为以下 ${platformName} 内容规划 ${input.count} 位 AI 试映观众的采样计划。
+
+标题：${input.title}
+正文：${input.bodyText}
+
+请根据标题、图片和正文推断可能受众，并规划高差异观众分布。
+
+要求：
+- 每个 directive 需要有清晰人群描述、人数、组内差异、理由和预期观察。
+- 输出聚焦整场分布和 directive 结构，姓名与单人采样 slot 由后续阶段生成。
+- planMarkdown 写成试映采样设计 brief，必须引用标题、正文、图片或平台上下文里的具体信息点，避免重复分组卡片中已有的人群名称、人数和差异轴。
+- planMarkdown 保持自然连贯，并使用 2-3 个短段落呈现，不要输出单个长段落。
+- 采样计划必须围绕这篇内容的具体承诺、场景、对象和平台互动方式设计，不要输出可套用到任意内容的通用观众计划。
+- 输出数量必须精确覆盖 ${input.count} 位观众。
+- 使用 NDJSON frame protocol 输出：一行一个完整 JSON frame。`
+            },
+            ...input.imageUrls.flatMap((url) => {
+              const imageUrl = absoluteUrlOrNull(url);
+              return imageUrl
+                ? [{
+              type: "image" as const,
+              image: imageUrl
+            }]
+                : [];
+            })
+          ]
+        }
+      ],
+      temperature: TEMPERATURE_CREATIVE,
+      maxRetries: getSharedCapacityManager().getMaxRetries(),
+      ...aiSdkTrace({ ...input.trace, taskType: "audience_plan", promptVersion: PROMPT_VERSION_AUDIENCE_PLAN })
+    });
+
+    const lineBuffer = new NdjsonLineBuffer();
+    const accumulator = new PlanFrameAccumulator(input.count);
+    let providerReasoningEmitted = false;
+    let reasoningTokenEstimate = 0;
+    let reasoningTokens: number | undefined;
+
+    for await (const part of result.fullStream) {
+      if (part.type === "reasoning-delta") {
+        providerReasoningEmitted = true;
+        reasoningTokenEstimate += estimateReasoningDeltaTokens(part.text);
+        reasoningTokens = extractReasoningTokenCount(part) ?? reasoningTokens;
+        await input.onReasoningDelta?.(part.text, { tokens: reasoningTokens, tokenEstimate: reasoningTokenEstimate });
+        await emitProgress({
+          stage: "public_reasoning",
+          label: "读取公开推理",
+          detail: "正在接收 provider 返回的 reasoning 流。",
+          targetCount: input.count
+        });
+      }
+      if (part.type === "text-delta") {
+        const lines = lineBuffer.push(part.text);
+        for (const line of lines) {
+          const trimmed = line.trim();
+          if (!trimmed) continue;
+          let parsed: unknown;
+          try {
+            parsed = JSON.parse(trimmed);
+          } catch {
+            const errFrame: AudiencePlanFrame = { type: "parser_error", line: trimmed.slice(0, 200), message: "JSON 解析失败" };
+            accumulator.apply(errFrame);
+            if (input.onFrame) await input.onFrame(errFrame, accumulator.toPreview());
+            continue;
+          }
+          const result = AudiencePlanFrameSchema.safeParse(parsed);
+          if (!result.success) {
+            const errFrame: AudiencePlanFrame = { type: "parser_error", line: trimmed.slice(0, 200), message: `未知或非法 frame 类型` };
+            accumulator.apply(errFrame);
+            if (input.onFrame) await input.onFrame(errFrame, accumulator.toPreview());
+            continue;
+          }
+          accumulator.apply(result.data);
+          if (input.onFrame) await input.onFrame(result.data, accumulator.toPreview());
+
+          // Emit compatible progress events for legacy consumers
+          if (!providerReasoningEmitted) {
+            await emitProgress({
+              stage: "public_reasoning",
+              label: "读取公开推理",
+              detail: "正在接收 NDJSON frame 流。",
+              targetCount: input.count
+            });
+          }
+          if (result.data.type === "dimension_upsert") {
+            await emitProgress({
+              stage: "dimensions",
+              label: "读取拆分维度",
+              detail: `已读取维度：${accumulator.toPreview().dimensions.map(d => d.label).join("、")}`,
+              targetCount: input.count
+            });
+          }
+          if (result.data.type === "directive_started" || result.data.type === "directive_patch" || result.data.type === "directive_completed") {
+            const preview = accumulator.toPreview();
+            await emitProgress({
+              stage: "directives",
+              label: "读取观众分组",
+              detail: `已读取 ${preview.directives.length} 个分组草稿。`,
+              directiveCount: preview.directives.length,
+              quantityTotal: preview.quantityTotal,
+              targetCount: input.count
+            });
+          }
+          if (result.data.type === "plan_completed") {
+            const preview = accumulator.toPreview();
+            await emitProgress({
+              stage: "plan_summary",
+              label: "读取计划说明",
+              detail: `已完成 plan frame 流；${preview.directives.length} 组，人数合计 ${preview.quantityTotal}/${input.count}。`,
+              directiveCount: preview.directives.length,
+              quantityTotal: preview.quantityTotal,
+              targetCount: input.count
+            });
+          }
+        }
+      }
+    }
+
+    // Flush remaining buffer
+    const remaining = lineBuffer.flush();
+    for (const line of remaining) {
+      const trimmed = line.trim();
+      if (!trimmed) continue;
+      let parsed: unknown;
+      try {
+        parsed = JSON.parse(trimmed);
+      } catch {
+        const errFrame: AudiencePlanFrame = { type: "parser_error", line: trimmed.slice(0, 200), message: "JSON 解析失败" };
+        accumulator.apply(errFrame);
+        if (input.onFrame) await input.onFrame(errFrame, accumulator.toPreview());
+        continue;
+      }
+      const result = AudiencePlanFrameSchema.safeParse(parsed);
+      if (!result.success) {
+        const errFrame: AudiencePlanFrame = { type: "parser_error", line: trimmed.slice(0, 200), message: "未知或非法 frame 类型" };
+        accumulator.apply(errFrame);
+        if (input.onFrame) await input.onFrame(errFrame, accumulator.toPreview());
+        continue;
+      }
+      accumulator.apply(result.data);
+      if (input.onFrame) await input.onFrame(result.data, accumulator.toPreview());
+    }
+
+    const draft = accumulator.compile();
+    validateSamplingPlanDraft(draft, input.count);
+    return draft;
+  }
+
+
+  async generateAudienceSamplingPlanRevision(input: {
+    title: string;
+    coverImageUrl: string;
+    imageUrls: string[];
+    bodyText: string;
+    plan: AudienceSamplingPlanViewForProvider;
+    messages: AudienceSamplingPlanRevisionMessage[];
+    trace?: LlmTraceContext;
+  }): Promise<AudienceSamplingPlanRevisionProposal> {
+    const platformName = this.platformName;
+    const result = await generateText({
+      model: this.aiSdkOpenaiCompatible.chatModel(this.modelForTask("audience_plan_revision")),
+      system: `你是"${platformName} 内容发布前 AI 试映会"的观众分布优化 agent。
+
+你的任务是在当前未确认的 AudienceSamplingPlan 上，根据用户对话生成可预览、可应用的结构化修改建议。
+
+你的输出只负责生成建议卡片；用户采纳后，系统会通过普通 API 写入数据库。
+本阶段的操作对象是 AudienceSamplingDirective，包括新增分组、修改分组和删除分组。
+整体重做适用于用户明确要求重新规划整场分布的场景。
+响应只使用下面 schema 中列出的 operation。
+
+响应必须是可 JSON.parse 的对象：
+{
+  "summary": string,
+  "operations": Array<
+    { "operationId": string, "op": "add_directive", "directive": { "name": string, "description": string, "quantity": number, "diversityAxes": string[], "rationale": string, "sortOrder"?: number }, "reason": string }
+    | { "operationId": string, "op": "update_directive", "directiveId": string, "patch": { "name"?: string, "description"?: string, "quantity"?: number, "diversityAxes"?: string[], "rationale"?: string, "sortOrder"?: number }, "before"?: object, "reason": string }
+    | { "operationId": string, "op": "delete_directive", "directiveId": string, "reason": string }
+  >,
+  "totalCountChange": { "before": number, "after": number } | null,
+  "warnings": string[]
+}
+
+规则：
+- totalCount 来源于当前 directive.quantity 合计，作为保存后的实时计划人数。
+- 用户要求新增人群时，默认输出 add_directive，并让 totalCountChange.after 反映新增后的实时合计；新增分组独立增加计划人数。
+- 用户明确说拆分、替换、合并、调出名额或保持总人数时，用配套 update/delete 操作表达人数转移。
+- 用户要求删除人群时，默认减少总人数；只有用户明确要求保留总人数或重新分配时，才把删除人数分配到其他分组。
+- update_directive 只在 patch 中输出实际要改的字段。
+- 新增 directive 必须有自然语言 description、正整数 quantity、非空 diversityAxes 和 rationale。
+- 如果用户 @ 了分组，相关 update/delete 使用该分组 directiveId。
+- 讨论型回复可以返回 operations: []。
+- 只输出 JSON 对象。
+
+prompt_version=${PROMPT_VERSION_SAMPLING_PLAN_REVISION}`,
+      messages: [
+        {
+          role: "user",
+          content: [
+            {
+              type: "text",
+              text: `内容标题：${input.title}
+内容正文：${input.bodyText}
+
+当前采样计划：
+${JSON.stringify(input.plan, null, 2)}
+
+本地对话历史（hiddenMentionContexts 是前端隐藏上下文，只帮助理解用户消息；后端应用时仍以 DB 为准）：
+${JSON.stringify(input.messages, null, 2)}
+
+请输出一个观众分布优化建议 proposal。`
+            },
+            ...input.imageUrls.flatMap((url) => {
+              const imageUrl = absoluteUrlOrNull(url);
+              return imageUrl
+                ? [{ type: "image" as const, image: imageUrl }]
+                : [];
+            })
+          ]
+        }
+      ],
+      temperature: TEMPERATURE_PRECISE,
+      maxRetries: getSharedCapacityManager().getMaxRetries(),
+      ...aiSdkTrace({ ...input.trace, taskType: "audience_plan_revision", promptVersion: PROMPT_VERSION_SAMPLING_PLAN_REVISION })
+    });
+    const raw = result.text || "{}";
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(extractJson(raw));
+    } catch {
+      throw new Error(`Failed to parse LLM response as JSON. Raw output: ${raw.slice(0, 200)}`);
+    }
+    return AudienceSamplingPlanRevisionProposalSchema.parse(parsed);
+  }
+
+  async generateAudienceSeatRevision(input: {
+    title: string;
+    coverImageUrl: string;
+    imageUrls: string[];
+    bodyText: string;
+    plan: AudienceSamplingPlanViewForProvider | null;
+    progress: AudienceGenerationProgressView;
+    messages: AudienceSeatRevisionMessage[];
+    trace?: LlmTraceContext;
+  }): Promise<AudienceSeatRevisionProposal> {
+    const platformName = this.platformName;
+    const result = await generateText({
+      model: this.aiSdkOpenaiCompatible.chatModel(this.modelForTask("audience_seat_revision")),
+      system: `你是"${platformName} 内容发布前 AI 试映会"的观众席打磨 agent。
+
+你的任务是在已确认采样计划和已生成观众结果的基础上，帮助用户讨论、解释并生成结果层修改建议。
+
+你的输出只负责生成建议卡片；用户采纳后，系统会通过普通 API 写入数据库。
+本阶段的操作对象是具体观众结果和观众人设。
+可用 operation：update_identity、regenerate_identity、delete_profile、favorite_identity、retry_identity、add_profile。
+新增观众使用 add_profile；系统会在对应分组下创建 AudienceProfile，同步该分组人数、计划总人数和试映观众数，并启动单个人设生成任务。
+运行期 Journey、评论、互动由开始试映后的调度器生成；本阶段聚焦观众结果和人设准备。
+
+响应必须是可 JSON.parse 的对象：
+{
+  "summary": string,
+  "operations": Array<
+    { "operationId": string, "op": "update_identity", "profileId": string, "patch": { "displayName"?: string, "avatarUrl"?: string | null, "personaJson"?: { "profile": string, "personality": string, "mbtiType": string, "responseStyle": string } }, "before"?: object, "reason": string }
+    | { "operationId": string, "op": "regenerate_identity", "profileId": string, "reason": string }
+    | { "operationId": string, "op": "delete_profile", "profileId": string, "reason": string }
+    | { "operationId": string, "op": "favorite_identity", "profileId": string, "favorited": boolean, "reason": string }
+    | { "operationId": string, "op": "retry_identity", "profileId": string, "reason": string }
+    | { "operationId": string, "op": "add_profile", "directiveId": string, "samplingLabel": string, "demographics": object, "reason": string }
+  >,
+  "warnings": string[]
+}
+
+规则：
+- update_identity 只输出实际要改的字段。
+- personaJson 四段必须是完整自然语言字符串，mbtiType 必须是 16 种 MBTI 类型之一。
+- 用户要求新增观众、增加人数或多加几个人时，输出 add_profile。
+- 用户要求替换某个观众时，按意图组合 delete_profile 与 add_profile，或使用 regenerate_identity。
+- 用户要求补齐失败/缺口时，优先使用 retry_identity；需要额外增加新观众时使用 add_profile。
+- 讨论型回复可以返回 operations: []。
+- 只输出 JSON 对象。
+
+prompt_version=${PROMPT_VERSION_SEAT_REVISION}`,
+      messages: [
+        {
+          role: "user",
+          content: [
+            {
+              type: "text",
+              text: `内容标题：${input.title}
+内容正文：${input.bodyText}
+
+已确认采样计划：
+${JSON.stringify(input.plan, null, 2)}
+
+观众生成进度与结果：
+${JSON.stringify(input.progress, null, 2)}
+
+本地对话历史：
+${JSON.stringify(input.messages, null, 2)}
+
+请输出一个观众席打磨建议 proposal。`
+            },
+            ...input.imageUrls.flatMap((url) => {
+              const imageUrl = absoluteUrlOrNull(url);
+              return imageUrl
+                ? [{ type: "image" as const, image: imageUrl }]
+                : [];
+            })
+          ]
+        }
+      ],
+      temperature: TEMPERATURE_PRECISE,
+      maxRetries: getSharedCapacityManager().getMaxRetries(),
+      ...aiSdkTrace({ ...input.trace, taskType: "audience_seat_revision", promptVersion: PROMPT_VERSION_SEAT_REVISION })
+    });
+    const raw = result.text || "{}";
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(extractJson(raw));
+    } catch {
+      throw new Error(`Failed to parse LLM response as JSON. Raw output: ${raw.slice(0, 200)}`);
+    }
+    return AudienceSeatRevisionProposalSchema.parse(parsed);
+  }
+
+  async expandAudienceProfiles(input: {
+    title: string;
+    coverImageUrl: string;
+    imageUrls: string[];
+    bodyText: string;
+    plan: AudienceSamplingPlanViewForProvider;
+    directive: AudienceSamplingDirectiveView;
+    chunkStart: number;
+    chunkCount: number;
+    onFrame: (frame: AudienceProfileExpansionFrame) => void | Promise<void>;
+    trace?: LlmTraceContext;
+  }): Promise<void> {
+    const platformName = this.platformName ?? DEFAULT_PLATFORM_NAME;
+    const chunkStart = input.chunkStart;
+    const chunkCount = input.chunkCount;
+    const modelName = this.modelForTask("audience_profile_expansion");
+    const result = streamText({
+      model: this.aiSdkOpenaiCompatible.chatModel(modelName),
+      system: `你是"${platformName} 内容发布前 AI 试映会"的观众采样 slot 扩展 agent。
+
+任务：把一个已确认的 audience directive 展开成指定数量的采样 slot。采样 slot 用于覆盖差异方向和减少重复。
+
+输出格式是 NDJSON：一行一个完整 JSON frame。
+
+支持的 frame 类型：
+{ "type": "profile_completed", "sampleIndex": number, "profile": { "samplingLabel": string, "demographics": { "gender": string, "ageRange": string, "cityTier": string, "lifeStage": string, "role": string, "spendingPower": string } } }
+
+字段标准：
+- sampleIndex 是当前 directive 内的全局索引，从 ${chunkStart} 开始。
+- samplingLabel 是 4-12 个中文字符的采样标签，便于用户扫读。
+- demographics 六个字段全部存在；无法确定或不影响反应的字段填"不限定"。每个字段都用短词或短短语，不写解释句。
+- demographics.role 只写基础身份或关系，通常 1-6 个中文字符，例如"准妈妈""新手妈妈""准爸爸""伴侣""长辈""送礼者""路人用户""专业从业者"。不要把阶段、动机、决策方式或采样差异写进 role。
+- lifeStage 写当前阶段，例如"孕晚期""产后3个月""备孕期""带娃1年"。
+- spendingPower 写消费能力或预算倾向，例如"预算敏感""中等""愿为省心付费"。
+- 同一个 directive 下的 profiles 合起来覆盖 diversityAxes。
+- 输出使用自然中文，保持具体、克制、可作为后续 persona 生成输入。
+
+只输出 NDJSON frames。`,
+      messages: [
+        {
+          role: "user",
+          content: [
+            {
+              type: "text",
+              text: `请基于以下 ${platformName} 内容和已确认采样计划，展开 directive 对应的 ${chunkCount} 个采样 slot（索引从 ${chunkStart} 到 ${chunkStart + chunkCount - 1}）。
+
+标题：${input.title}
+正文：${input.bodyText}
+
+采样计划：
+${JSON.stringify(input.plan)}
+
+当前 directive：
+${JSON.stringify(input.directive)}
+
+要求：
+- 输出数量必须等于 ${chunkCount}。
+- sampleIndex 从 ${chunkStart} 开始递增。
+- 每个 demographics 对象都包含 gender、ageRange、cityTier、lifeStage、role、spendingPower。
+- role 只写基础身份或关系，不写"自主决策""集中采购""依赖评论区"等采样差异。
+- 每个 slot 的采样角度清晰不同，并覆盖当前 directive.diversityAxes。`
+            },
+            ...input.imageUrls.flatMap((url) => {
+              const imageUrl = absoluteUrlOrNull(url);
+              return imageUrl
+                ? [{
+              type: "image" as const,
+              image: imageUrl
+            }]
+                : [];
+            })
+          ]
+        }
+      ],
+      temperature: TEMPERATURE_BALANCED,
+      maxRetries: getSharedCapacityManager().getMaxRetries(),
+      ...aiSdkTrace({
+        ...input.trace,
+        taskType: "audience_profile_expansion",
+        promptVersion: PROMPT_VERSION_PROFILE_EXPANSION,
+        metadata: {
+          ...(input.trace?.metadata ?? {}),
+          directiveId: input.directive.id,
+          chunkStart,
+          chunkCount
+        }
+      })
+    });
+
+    const lineBuffer = new NdjsonLineBuffer();
+
+    for await (const part of result.fullStream) {
+      if (part.type === "text-delta") {
+        const lines = lineBuffer.push(part.text);
+        for (const line of lines) {
+          const trimmed = line.trim();
+          if (!trimmed) continue;
+          let parsed: unknown;
+          try {
+            parsed = JSON.parse(trimmed);
+          } catch {
+            const errFrame: AudienceProfileExpansionFrame = { type: "parser_error", line: trimmed.slice(0, 200), message: "JSON 解析失败" };
+            if (input.onFrame) await input.onFrame(errFrame);
+            continue;
+          }
+          const result = AudienceProfileExpansionFrameSchema.safeParse(parsed);
+          if (!result.success) {
+            const errFrame: AudienceProfileExpansionFrame = { type: "parser_error", line: trimmed.slice(0, 200), message: "未知或非法 frame 类型" };
+            if (input.onFrame) await input.onFrame(errFrame);
+            continue;
+          }
+          if (result.data.type === "profile_completed") {
+            // Validated below by the service as each frame is persisted.
+          }
+          await input.onFrame(result.data);
+        }
+      }
+    }
+
+    // Flush remaining buffer
+    const remaining = lineBuffer.flush();
+    for (const line of remaining) {
+      const trimmed = line.trim();
+      if (!trimmed) continue;
+      let parsed: unknown;
+      try {
+        parsed = JSON.parse(trimmed);
+      } catch {
+        const errFrame: AudienceProfileExpansionFrame = { type: "parser_error", line: trimmed.slice(0, 200), message: "JSON 解析失败" };
+        if (input.onFrame) await input.onFrame(errFrame);
+        continue;
+      }
+      const result = AudienceProfileExpansionFrameSchema.safeParse(parsed);
+      if (!result.success) {
+        const errFrame: AudienceProfileExpansionFrame = { type: "parser_error", line: trimmed.slice(0, 200), message: "未知或非法 frame 类型" };
+        if (input.onFrame) await input.onFrame(errFrame);
+        continue;
+      }
+      if (result.data.type === "profile_completed") {
+        // Validated below by the service as each frame is persisted.
+      }
+      await input.onFrame(result.data);
+    }
+  }
+
+  async generateAudiencePersona(input: {
+    profile: {
+      profileId: string;
+      demographics: Record<string, unknown>;
+    };
+    platformName?: string;
+    trace?: LlmTraceContext;
+  }): Promise<GeneratedAudience> {
+    const platformName = input.platformName ?? this.platformName ?? DEFAULT_PLATFORM_NAME;
+    const result = await generateText({
+      model: this.aiSdkOpenaiCompatible.chatModel(this.modelForTask("audience_persona")),
+      system: `你是"${platformName} 内容发布前 AI 试映会"的观众身份生成 agent。
+
+任务：根据一个采样 slot，生成一个具体、稳定、可长期复用的 ${platformName} 用户人设。
+
+采样 slot 是待覆盖的用户位置，不是完整人设。它提供人口信息、生活阶段、基础身份和消费倾向。你需要把这些基础信息扩展成一个自然、可信、有一致性的用户。
+
+响应格式是可直接 JSON.parse 的对象：
+{
+  "profileId": string,
+  "displayName": string,
+  "persona": {
+    "profile": string,
+    "personality": string,
+    "mbtiType": string,
+    "responseStyle": string
+  }
+}
+
+字段标准：
+- displayName 是这个人的名字，像真实生活里会被别人称呼的名字，可以是中文姓名、小名或自然称呼，不承担身份说明功能。
+- profile 是这个人的背景小传，写现实生活中的稳定背景、生活阶段、家庭或工作处境、消费处境、过往人生经历和长期生活习惯，让读者能想象这个人，并让人设丰满且可长期复用。可以合理补全职业经历、家庭结构、城市生活状态、照护支持、长期消费习惯和生活节奏。
+- personality 写稳定性格、风险偏好、社交倾向、情绪表达和决策耐心，使用自然短句，不写成身份介绍。
+- mbtiType 必须是 MBTI 16 型之一：${MBTI_TYPES.join("、")}。
+- responseStyle 写这个人在 ${platformName} 上的浏览判断方式、互动倾向和评论表达习惯，使用平台行为习惯描述。
+- persona 四个字段彼此一致，并自然继承采样 slot 的核心差异。
+
+只输出 JSON 对象。`,
+      messages: [
+        {
+          role: "user",
+          content: `请根据这个采样 slot，生成一个 ${platformName} 用户 persona。
+
+采样 slot：
+${JSON.stringify({ profileId: input.profile.profileId, demographics: input.profile.demographics })}
+
+输出要求：
+- 带回 profileId。
+- displayName 是这个人的名字，像真实生活里会被别人称呼的名字，不承担身份说明功能。
+- profile、personality、responseStyle 都是完整自然语言字符串。
+- profile 主要补充现实生活背景和人生经历，平台浏览和评论习惯放在 responseStyle。
+- profile 使用背景小传写法，不使用第一人称。
+- mbtiType 使用合法 16 型。`
+        }
+      ],
+      temperature: TEMPERATURE_CREATIVE,
+      maxRetries: getSharedCapacityManager().getMaxRetries(),
+      ...aiSdkTrace({
+        ...input.trace,
+        taskType: "audience_persona",
+        promptVersion: PROMPT_VERSION_AUDIENCE_PERSONA,
+        profileId: input.trace?.profileId ?? input.profile.profileId
+      })
+    });
+    const raw = result.text || "{}";
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(extractJson(raw));
+    } catch {
+      throw new Error(`Failed to parse LLM response as JSON. Raw output: ${raw.slice(0, 200)}`);
+    }
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+      throw new Error("AUDIENCE_GENERATION_FAILED: model did not return a persona object.");
+    }
+    return normalizeGeneratedAudience(parsed as GeneratedAudience);
+  }
+
+  async runAudienceTurn(context: RunParticipantContext) {
+    const promptVersion = audiencePromptVersion(context);
+    const model = this.modelForTask("agent_turn");
+    const messages = [
+      { role: "user" as const, content: buildAudienceIdentityPrompt(context) },
+      ...context.messages
+    ];
+    const runtimeContext = createAiSdkToolRuntimeContext({
+      runId: context.runId,
+      participantId: context.participantId,
+      actionId: context.actionId
+    });
+    const steps: unknown[] = [];
+    if (!context.maxSteps) throw new Error("runAudienceTurn: maxSteps is required");
+    const maxSteps = context.maxSteps;
+    const requestPayload: Record<string, unknown> = {
+      model,
+      system: buildAudienceSystemPrompt(context, this.platformName),
+      messages,
+      maxSteps,
+      temperature: TEMPERATURE_BALANCED
+    };
+
+    const result = await generateText({
+      model: this.aiSdkOpenaiCompatible.chatModel(model),
+      system: buildAudienceSystemPrompt(context, this.platformName),
+      messages,
+      tools: createAiSdkToolSet(runtimeContext),
+      stopWhen: stepCountIs(maxSteps),
+      temperature: TEMPERATURE_BALANCED,
+      maxRetries: getSharedCapacityManager().getMaxRetries(),
+      abortSignal: context.signal,
+      timeout: context.timeoutMs && context.timeoutMs > 0
+        ? { totalMs: context.timeoutMs, stepMs: context.stepTimeoutMs }
+        : undefined,
+      ...aiSdkTrace({
+        runId: context.runId,
+        taskType: "agent_turn",
+        promptVersion,
+        agentTurnId: context.actionId,
+        participantId: context.participantId,
+        metadata: { journeyId: context.journeyId, stepIndex: context.stepIndex }
+      }),
+      onStepFinish: async (step) => {
+        steps.push(step);
+        try {
+          await persistStep(runtimeContext.currentAgentTurnId, step, { promptVersion });
+        } catch (err) {
+          // AI SDK's notify() silently swallows callback errors — log explicitly so data loss is visible
+          log.error({ err, turnId: runtimeContext.currentAgentTurnId, runId: context.runId },
+            "[RealAgent] persistStep failed — step data may be lost from transcript");
+        }
+        const nextTurnId = await completeAiSdkStepAndPrepareNext(runtimeContext.currentAgentTurnId, step, maxSteps);
+        if (nextTurnId) runtimeContext.currentAgentTurnId = nextTurnId;
+      }
+    });
+
+    const toolCalls = parsedToolCallsFromAiSdkSteps(steps);
+    const rawResponse: Record<string, unknown> = {
+      provider: "ai-sdk",
+      model,
+      finishReason: result.finishReason,
+      usage: result.usage,
+      steps: steps.map(serializableAiSdkStep)
+    };
+
+    return {
+      thoughtText: result.text.trim(),
+      reasoningText: result.reasoningText?.trim() || undefined,
+      toolCalls,
+      managedRuntime: true,
+      rawOutput: {
+        provider: "ai-sdk",
+        finalOutput: result.text,
+        reasoningText: result.reasoningText,
+        toolCalls
+      },
+      model,
+      promptVersion,
+      requestJson: requestPayload,
+      rawResponseJson: rawResponse,
+      parsedToolCallsJson: toolCalls
+    };
+  }
+}
+
+function audiencePromptVersion(_context: RunParticipantContext) {
+  return PROMPT_VERSION_AGENT;
+}
+
+function buildAudienceSystemPrompt(_context: RunParticipantContext, platformName: string) {
+  return `你是一个正在刷 ${platformName} 的真实用户。
+你的目标是按自己的兴趣、需求、信任感和耐心，自然决定要不要继续看、点开、阅读、互动或离开。
+
+每轮先输出一句很短的当下想法，然后调用一个或多个自然行为工具。
+短想法要求：
+- 8 到 40 个字；
+- 像真实用户脑子里闪过的一句话；
+- 不写分析报告；
+- 不打分；
+- 不总结全文；
+- 不出现"试映、Agent、模型、任务"等词。
+
+浏览状态与行为：
+
+你在信息流里（feed 阶段）：
+- 你只能看到帖子标题、封面、作者和摘要。
+- 标题、封面、作者或首屏信息让你想继续看，就 open_post。
+- 不想看就 exit_browsing，并记录结构化离开证据。
+
+你已经点开了帖子（post 阶段，open_post 返回了 postId）：
+- 想继续看正文但还没有明确互动冲动，用 read_post（传 postId、depth、可选 focus）。
+  - depth: skim（快速扫一眼）/ partial（认真看一部分）/ full（基本看完）。
+  - read_post 只表达"看了但不互动"，不改变任何计数。
+- 验证真实性、找补充经验、看争议或反例，用 view_comments（必须传 postId）。
+- 点赞（like_post）、收藏（favorite_post）、分享（share_post），都必须传 postId。
+- 写评论（write_comment，必须传 postId 和 intent；回复某条评论时额外传 replyToCommentId）。
+  - intent 标记评论意图：ask / doubt / share_experience / agree / joke / pushback。
+  - 评论内容按你的 persona 自然生成，不要写成评审报告。
+- 离开用 exit_browsing，记录 reasonCategory / readingDepth / interestLevel / trustLevel。
+
+你已经看过评论区（view_comments 返回了评论列表）：
+- 可以对已看到的评论点赞（like_comment，必须传你观察到的 commentId）。
+- 可以回复你实际观察到的任意评论（write_comment，content 写回复，replyToCommentId 传目标 commentId）。
+
+行为克制原则：
+- 点赞是低成本认同，不是表示"看过"。
+- 收藏适合清单、步骤、价格、材料、避坑等未来可能复查的内容。
+- 分享是低频强行为，只有明确想发给别人时才用。
+- 评论需要有明确表达冲动，不要为了互动而互动。
+- 很多人看完就走，不互动是正常的，用 read_post 或直接 exit_browsing。
+
+关键规则：
+- open_post 返回的 postId 是后续所有帖子操作的前置条件，必须显式传入。
+- like_comment 的 commentId 必须来自你实际观察到的评论，不能凭空捏造。
+- replyToCommentId 必须来自 view_comments 或前文工具结果中实际观察到的评论，不能凭空捏造。
+- 每一轮可以调用多个工具，但顺序必须像真实用户的连续动作。
+- 当你已经完成浏览或不想继续时，调用 exit_browsing。`;
+}
+
+function buildAudienceIdentityPrompt(context: RunParticipantContext) {
+  return `当前观众：
+显示名：${context.displayName}
+persona：
+${JSON.stringify(context.persona, null, 2)}`;
+}
+
+function parsedToolCallsFromAiSdkSteps(steps: unknown[]): ParsedToolCall[] {
+  return steps.flatMap((step) => {
+    const toolCalls = Array.isArray((step as { toolCalls?: unknown }).toolCalls)
+      ? (step as { toolCalls: unknown[] }).toolCalls
+      : [];
+    return toolCalls.map((toolCall, callIndex) => {
+      const record = objectRecord(toolCall);
+      const input = objectRecord(record.input);
+      const toolName = typeof record.toolName === "string" ? record.toolName : "";
+      const toolCallId = typeof record.toolCallId === "string" ? record.toolCallId : undefined;
+      return {
+        toolName: toolName as ParsedToolCall["toolName"],
+        args: input,
+        sdkCallId: toolCallId,
+        callIndex,
+        rawToolCall: {
+          id: toolCallId,
+          type: "function",
+          function: { name: toolName, arguments: JSON.stringify(input) }
+        }
+      };
+    }).filter((call) => Boolean(call.toolName));
+  });
+}
+
+function serializableAiSdkStep(step: unknown) {
+  const record = objectRecord(step);
+  return {
+    text: typeof record.text === "string" ? record.text : "",
+    reasoningText: typeof record.reasoningText === "string" ? record.reasoningText : undefined,
+    finishReason: record.finishReason,
+    usage: record.usage,
+    toolCalls: parsedToolCallsFromAiSdkSteps([step])
+  };
+}
+
+function objectRecord(value: unknown): Record<string, unknown> {
+  return value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : {};
+}
+
+export function extractJson(raw: string) {
+  const trimmed = raw.trim();
+  const fenced = trimmed.match(/```(?:json)?\s*([\s\S]*?)```/i);
+  if (fenced?.[1]) return fenced[1].trim();
+  const jsonValue = firstCompleteJsonValue(trimmed);
+  if (jsonValue) return jsonValue;
+  return trimmed;
+}
+
+function firstCompleteJsonValue(raw: string) {
+  const start = raw.search(/[\[{]/);
+  if (start < 0) return null;
+  const opener = raw[start];
+  const closer = opener === "{" ? "}" : "]";
+  const stack: string[] = [];
+  let inString = false;
+  let escaping = false;
+
+  for (let index = start; index < raw.length; index += 1) {
+    const char = raw[index];
+    if (inString) {
+      if (escaping) {
+        escaping = false;
+      } else if (char === "\\") {
+        escaping = true;
+      } else if (char === "\"") {
+        inString = false;
+      }
+      continue;
+    }
+    if (char === "\"") {
+      inString = true;
+      continue;
+    }
+    if (char === "{" || char === "[") {
+      stack.push(char === "{" ? "}" : "]");
+      continue;
+    }
+    if (char === "}" || char === "]") {
+      if (stack.pop() !== char) return null;
+      if (stack.length === 0 && char === closer) return raw.slice(start, index + 1);
+    }
+  }
+  return null;
+}
+
+function parseToolArgs(raw: string) {
+  try {
+    return JSON.parse(raw || "{}") as Record<string, unknown>;
+  } catch {
+    return {};
+  }
+}
+
+function validateSamplingPlanDraft(value: AudienceSamplingPlanDraft, count: number) {
+  if (!value || typeof value !== "object") throw new Error("AUDIENCE_PLAN_FAILED: model did not return an object.");
+  if (Number(value.totalCount) !== count) throw new Error("AUDIENCE_PLAN_FAILED: totalCount must match requested count.");
+  if (!Array.isArray(value.directives) || value.directives.length === 0) throw new Error("AUDIENCE_PLAN_FAILED: directives must be non-empty.");
+  const total = value.directives.reduce((sum, directive) => sum + Number(directive.quantity ?? 0), 0);
+  if (total !== count) throw new Error("AUDIENCE_PLAN_FAILED: directive quantities must match requested count.");
+  for (const directive of value.directives) {
+    if (!directive.name?.trim() || !directive.description?.trim() || !directive.rationale?.trim()) {
+      throw new Error("AUDIENCE_PLAN_FAILED: directive name, description, and rationale are required.");
+    }
+    if (!Number.isInteger(directive.quantity) || directive.quantity <= 0) throw new Error("AUDIENCE_PLAN_FAILED: directive quantity must be positive.");
+    if (!Array.isArray(directive.diversityAxes) || directive.diversityAxes.filter((item) => typeof item === "string" && item.trim()).length === 0) {
+      throw new Error("AUDIENCE_PLAN_FAILED: directive diversityAxes must be non-empty.");
+    }
+  }
+}
+
+async function progressFromPartialPlan(raw: string, targetCount: number): Promise<AudiencePlanProgressEvent | null> {
+  const parsed = await parsePartialJson(extractJsonPrefix(raw)).catch(() => null);
+  if (!parsed?.value || typeof parsed.value !== "object" || Array.isArray(parsed.value)) return null;
+  const value = parsed.value as Record<string, unknown>;
+
+  const reasoningTrace = Array.isArray(value.reasoningTrace) ? value.reasoningTrace : [];
+  const dimensions = cleanPartialStringArray(value.dimensions);
+  const directives = Array.isArray(value.directives)
+    ? value.directives.filter((item): item is Record<string, unknown> => Boolean(item && typeof item === "object" && !Array.isArray(item)))
+    : [];
+  const quantityTotal = directives.reduce((total, directive) => total + (typeof directive.quantity === "number" ? directive.quantity : 0), 0);
+
+  if (typeof value.totalCount === "number" && typeof value.planMarkdown === "string") {
+    return {
+      stage: "plan_summary",
+      label: "读取计划说明",
+      detail: `已读取 planMarkdown 和 totalCount；当前 ${directives.length} 组，人数合计 ${quantityTotal}/${targetCount}。`,
+      directiveCount: directives.length,
+      quantityTotal,
+      targetCount
+    };
+  }
+  if (directives.length > 0 && quantityTotal > 0) {
+    return {
+      stage: "quantities",
+      label: "读取人数分配",
+      detail: `已读取 directives[].quantity：${directives.length} 组，人数合计 ${quantityTotal}/${targetCount}。`,
+      directiveCount: directives.length,
+      quantityTotal,
+      targetCount
+    };
+  }
+  if (directives.length > 0) {
+    return {
+      stage: "directives",
+      label: "读取观众分组",
+      detail: `已读取 directives：${directives.length} 个分组草稿。`,
+      directiveCount: directives.length,
+      targetCount
+    };
+  }
+  if (dimensions.length > 0) {
+    return {
+      stage: "dimensions",
+      label: "读取拆分维度",
+      detail: `已读取 dimensions：${dimensions.slice(0, 5).join("、")}`,
+      targetCount
+    };
+  }
+  if (reasoningTrace.length > 0) {
+    return {
+      stage: "public_reasoning",
+      label: "读取公开推理",
+      detail: `已读取 reasoningTrace：${reasoningTrace.length} 条推理片段。`,
+      targetCount
+    };
+  }
+  return null;
+}
+
+async function partialReasoningTraceTexts(raw: string) {
+  const parsed = await parsePartialJson(extractJsonPrefix(raw)).catch(() => null);
+  if (!parsed?.value || typeof parsed.value !== "object" || Array.isArray(parsed.value)) return [];
+  const trace = (parsed.value as Record<string, unknown>).reasoningTrace;
+  if (!Array.isArray(trace)) return [];
+  return trace.flatMap((item) => {
+    if (!item || typeof item !== "object" || Array.isArray(item)) return [];
+    const text = (item as Record<string, unknown>).text;
+    return typeof text === "string" && text.trim() ? [text.trim()] : [];
+  });
+}
+
+function cleanPartialStringArray(value: unknown) {
+  return Array.isArray(value) ? value.filter((item): item is string => typeof item === "string" && item.trim().length > 0) : [];
+}
+
+function extractJsonPrefix(raw: string) {
+  const start = raw.indexOf("{");
+  return start >= 0 ? raw.slice(start) : raw;
+}
+
+function absoluteUrlOrNull(value: string) {
+  try {
+    const url = new URL(value);
+    return url.protocol === "http:" || url.protocol === "https:" || url.protocol === "data:" ? url : null;
+  } catch {
+    return null;
+  }
+}
+
+function normalizeGeneratedAudience(value: GeneratedAudience): GeneratedAudience {
+  return {
+    ...value,
+    persona: {
+      profile: requirePersonaString(value.persona?.profile, "profile"),
+      personality: requirePersonaString(value.persona?.personality, "personality"),
+      mbtiType: requireMbtiType(value.persona?.mbtiType),
+      responseStyle: requirePersonaString(value.persona?.responseStyle, "responseStyle")
+    }
+  };
+}
+
+function requirePersonaString(value: unknown, field: keyof Omit<GeneratedAudience["persona"], "mbtiType">): string {
+  if (typeof value !== "string" || !value.trim()) {
+    throw new Error(`AUDIENCE_GENERATION_FAILED: persona.${field} must be a non-empty string.`);
+  }
+  return value.trim();
+}
+
+const VALID_MBTI_TYPES = new Set(["INTJ", "INTP", "ENTJ", "ENTP", "INFJ", "INFP", "ENFJ", "ENFP", "ISTJ", "ISFJ", "ESTJ", "ESFJ", "ISTP", "ISFP", "ESTP", "ESFP"]);
+const REQUIRED_DEMOGRAPHICS_FIELDS = ["gender", "ageRange", "cityTier", "lifeStage", "role", "spendingPower"];
+
+function nonEmptyString(value: unknown): value is string {
+  return typeof value === "string" && value.trim().length > 0;
+}
+
+function requireMbtiType(value: unknown): string {
+  const raw = typeof value === "string" ? value.trim().toUpperCase() : "";
+  if (!VALID_MBTI_TYPES.has(raw)) {
+    throw new Error(`AUDIENCE_GENERATION_FAILED: persona.mbtiType must be one of 16 MBTI types, received "${value}".`);
+  }
+  return raw;
+}
+
+// ---------------------------------------------------------------------------
+// Sampling Plan System Prompt (NDJSON frame protocol)
+// ---------------------------------------------------------------------------
+
+function buildSamplingPlanSystemPrompt(platformName: string): string {
+  return `你是"${platformName} 内容发布前 AI 试映会"的观众采样计划 agent。
+
+你的任务是基于标题、图片和正文，规划一场高差异试映的观众分布。输出整场计划和采样指令，供用户审核分布、数量、理由和观察目标。
+
+响应必须使用 NDJSON frame protocol：一行一个完整 JSON 对象，不要输出 Markdown 代码块，不要输出外层数组，不要在 JSON 行前后输出解释文本。每一行都必须能独立 JSON.parse。
+
+支持的 frame：
+
+{ "type": "plan_markdown_delta", "text": string }
+{ "type": "dimension_upsert", "key": string, "label": string }
+{ "type": "directive_started", "key": string, "sortOrder": number }
+{ "type": "directive_patch", "key": string, "patch": { "name"?: string, "description"?: string, "quantity"?: number, "diversityAxes"?: string[], "rationale"?: string } }
+{ "type": "directive_completed", "key": string }
+{ "type": "plan_completed", "totalCount": number }
+
+输出顺序：
+1. 先用 1-3 个 plan_markdown_delta 逐步写出 planMarkdown。
+2. 再输出若干 dimension_upsert。
+3. 每个 directive 使用稳定 key，例如 d1、d2、d3。先 directive_started，再用一个或多个 directive_patch 填入字段，字段完整后输出 directive_completed。
+4. 所有 directive 完成后输出 plan_completed。
+
+生成原则：
+- totalCount 等于请求 count。
+- directives 的 quantity 总和必须等于 totalCount。
+- directive 描述的是一类采样组合，不是具体人。
+- 覆盖核心目标用户、相邻潜在人群、挑剔 / 专业 / 怀疑用户、低意向 / 路人用户。
+- planMarkdown 面向用户阅读，是试映采样设计 brief，用于说明系统如何理解内容、为什么这样设计观众、确认后会围绕哪些证据运行试映；必须引用标题、正文、图片或平台上下文里的具体信息点，结构化事实以 directives 为准。
+- planMarkdown 采用短句分行排版，每行一句话，句间用空行分隔，类似小红书 / 公众号的阅读节奏；控制在 160-280 个中文字符。// 硬编码为小红书/公众号写作风格指导，与 platformName 解耦，此处是写作技巧参考。
+- plan_markdown_delta.text 是 JSON 字符串字段；段落之间使用标准 JSON 换行转义 \\n\\n。
+- 可以使用少量列表或加粗，但不强制固定标题或固定模板；不使用复杂标题层级、表格或长列表。
+- name 是短名称，description 是自然语言人群描述；不要用短名称替代 description。
+- diversityAxes 每项用 2-6 个中文字符的自然短语描述组内差异维度（如"预算压力""家庭分工""广告敏感"），不使用英文缩写或 key 风格标签。
+- rationale 合并说明为什么需要这类人，以及重点观察什么行为或质疑。
+- 输出协议改为 NDJSON frame 后，采样判断、planMarkdown 写作质量、directive 字段含义和数量分配原则不变；不要为了流式输出降低内容具体性或分组质量。
+
+只输出 NDJSON frames。
+
+prompt_version=${PROMPT_VERSION_AUDIENCE_PLAN}`;
+}
+
+// ---------------------------------------------------------------------------
+// NdjsonLineBuffer — incremental line parser for NDJSON streams
+// ---------------------------------------------------------------------------
+
+export class NdjsonLineBuffer {
+  private buffer = "";
+
+  /**
+   * Push a text-delta chunk. Returns all complete lines found.
+   * Incomplete trailing content is held in the buffer.
+   */
+  push(chunk: string): string[] {
+    this.buffer += chunk;
+    const lines: string[] = [];
+    let newlineIndex: number;
+    while ((newlineIndex = this.buffer.indexOf("\n")) !== -1) {
+      let line = this.buffer.slice(0, newlineIndex);
+      if (line.endsWith("\r")) line = line.slice(0, -1);
+      lines.push(line);
+      this.buffer = this.buffer.slice(newlineIndex + 1);
+    }
+    return lines;
+  }
+
+  /**
+   * Flush remaining buffer content as a final line (if non-empty).
+   */
+  flush(): string[] {
+    const remaining = this.buffer;
+    this.buffer = "";
+    return remaining.trim() ? [remaining] : [];
+  }
+}
+
+// ---------------------------------------------------------------------------
+// PlanFrameAccumulator — accumulates frames into preview state and compiles
+// to AudienceSamplingPlanDraft
+// ---------------------------------------------------------------------------
+
+type InternalDirectiveState = {
+  key: string;
+  sortOrder: number;
+  status: AudiencePlanPreviewDirectiveStatus;
+  name?: string;
+  description?: string;
+  quantity?: number;
+  diversityAxes?: string[];
+  rationale?: string;
+};
+
+export class PlanFrameAccumulator {
+  private planMarkdown = "";
+  private dimensions: Array<{ key: string; label: string }> = [];
+  private directives: Map<string, InternalDirectiveState> = new Map();
+  private directiveOrder: string[] = [];
+  private totalCount: number | null = null;
+  private completed = false;
+  private validationIssues: string[] = [];
+  private readonly targetCount: number;
+
+  constructor(targetCount: number) {
+    this.targetCount = targetCount;
+  }
+
+  apply(frame: AudiencePlanFrame): void {
+    switch (frame.type) {
+      case "plan_markdown_delta":
+        this.planMarkdown += normalizePlanMarkdownDelta(frame.text);
+        break;
+
+      case "dimension_upsert": {
+        const existing = this.dimensions.find(d => d.key === frame.key);
+        if (existing) {
+          existing.label = frame.label;
+        } else {
+          this.dimensions.push({ key: frame.key, label: frame.label });
+        }
+        break;
+      }
+
+      case "directive_started": {
+        if (this.directives.has(frame.key)) {
+          this.validationIssues.push(`directive_started 重复 key: ${frame.key}`);
+          return;
+        }
+        this.directiveOrder.push(frame.key);
+        this.directives.set(frame.key, {
+          key: frame.key,
+          sortOrder: frame.sortOrder,
+          status: "streaming"
+        });
+        break;
+      }
+
+      case "directive_patch": {
+        const directive = this.directives.get(frame.key);
+        if (!directive) {
+          this.validationIssues.push(`directive_patch 收到未知 key: ${frame.key}`);
+          return;
+        }
+        if (frame.patch.name !== undefined) directive.name = frame.patch.name;
+        if (frame.patch.description !== undefined) directive.description = frame.patch.description;
+        if (frame.patch.quantity !== undefined) directive.quantity = frame.patch.quantity;
+        if (frame.patch.diversityAxes !== undefined) directive.diversityAxes = frame.patch.diversityAxes;
+        if (frame.patch.rationale !== undefined) directive.rationale = frame.patch.rationale;
+        break;
+      }
+
+      case "directive_completed": {
+        const directive = this.directives.get(frame.key);
+        if (!directive) {
+          this.validationIssues.push(`directive_completed 收到未知 key: ${frame.key}`);
+          return;
+        }
+        // Validate completeness
+        const isComplete =
+          directive.name?.trim() &&
+          directive.description?.trim() &&
+          typeof directive.quantity === "number" && directive.quantity > 0 &&
+          Array.isArray(directive.diversityAxes) && directive.diversityAxes.length > 0 &&
+          directive.rationale?.trim();
+        directive.status = isComplete ? "complete" : "invalid";
+        if (!isComplete) {
+          this.validationIssues.push(`directive "${frame.key}" 字段不完整，标记为 invalid`);
+        }
+        break;
+      }
+
+      case "plan_completed":
+        this.totalCount = frame.totalCount;
+        this.completed = true;
+        break;
+
+      case "parser_error":
+        this.validationIssues.push(`解析错误: ${frame.message} (${frame.line.slice(0, 80)})`);
+        break;
+
+      case "validation_issue":
+        this.validationIssues.push(frame.message);
+        break;
+    }
+  }
+
+  toPreview(): AudiencePlanPreview {
+    const directives: AudiencePlanPreviewDirective[] = this.directiveOrder
+      .map(key => this.directives.get(key)!)
+      .filter(Boolean)
+      .map(d => ({
+        key: d.key,
+        sortOrder: d.sortOrder,
+        status: d.status,
+        name: d.name,
+        description: d.description,
+        quantity: d.quantity,
+        diversityAxes: d.diversityAxes,
+        rationale: d.rationale
+      }));
+
+    const quantityTotal = directives.reduce((sum, d) => sum + (d.quantity ?? 0), 0);
+
+    return {
+      planMarkdown: this.planMarkdown,
+      dimensions: this.dimensions.map(d => ({ key: d.key, label: d.label })),
+      directives,
+      quantityTotal,
+      targetCount: this.targetCount,
+      completed: this.completed,
+      validationIssues: [...this.validationIssues]
+    };
+  }
+
+  compile(): AudienceSamplingPlanDraft {
+    if (!this.completed) {
+      throw new Error("AUDIENCE_PLAN_FAILED: 未收到 plan_completed frame。");
+    }
+    if (!this.planMarkdown.trim()) {
+      throw new Error("AUDIENCE_PLAN_FAILED: planMarkdown 不能为空。");
+    }
+    if (this.validationIssues.length > 0) {
+      throw new Error(`AUDIENCE_PLAN_FAILED: frame 流存在解析或校验问题：${this.validationIssues.join("；")}`);
+    }
+
+    const orderedDirectives = this.directiveOrder
+      .map(key => this.directives.get(key)!)
+      .filter(Boolean);
+
+    const directiveDrafts: AudienceSamplingDirectiveDraft[] = orderedDirectives.map(d => {
+      if (d.status !== "complete") {
+        throw new Error(`AUDIENCE_PLAN_FAILED: directive "${d.key}" 未收到完整 directive_completed frame。`);
+      }
+      return {
+        name: requireNonEmpty(d.name, "directive name"),
+        description: requireNonEmpty(d.description, "directive description"),
+        quantity: requirePositiveInt(d.quantity, "directive quantity"),
+        diversityAxes: requireNonEmptyArray(d.diversityAxes, "directive diversityAxes"),
+        rationale: requireNonEmpty(d.rationale, "directive rationale")
+      };
+    });
+
+    return {
+      totalCount: this.totalCount ?? this.targetCount,
+      planMarkdown: this.planMarkdown,
+      dimensions: this.dimensions.map(d => d.label),
+      directives: directiveDrafts
+    };
+  }
+}
+
+function requireNonEmpty(value: string | undefined, field: string): string {
+  if (!value?.trim()) throw new Error(`AUDIENCE_PLAN_FAILED: ${field} 不能为空。`);
+  return value.trim();
+}
+
+function normalizePlanMarkdownDelta(text: string): string {
+  return text.replace(/\\n/g, "\n");
+}
+
+function estimateReasoningDeltaTokens(text: string): number {
+  const chars = Array.from(text.trim()).length;
+  if (chars === 0) return 0;
+  return Math.max(1, Math.ceil(chars / 1.8));
+}
+
+function extractReasoningTokenCount(part: unknown): number | undefined {
+  const values = part && typeof part === "object" ? part as Record<string, unknown> : {};
+  const candidates = [
+    values.reasoningTokens,
+    values.reasoningTokenCount,
+    values.reasoning_tokens,
+    typeof values.usage === "object" && values.usage ? (values.usage as Record<string, unknown>).reasoningTokens : undefined,
+    typeof values.usage === "object" && values.usage ? (values.usage as Record<string, unknown>).reasoning_tokens : undefined
+  ];
+  const found = candidates.find((value): value is number => typeof value === "number" && Number.isFinite(value) && value >= 0);
+  return found;
+}
+
+function requirePositiveInt(value: number | undefined, field: string): number {
+  if (!Number.isInteger(value) || (value as number) <= 0) throw new Error(`AUDIENCE_PLAN_FAILED: ${field} 必须为正整数。`);
+  return value as number;
+}
+
+function requireNonEmptyArray(value: string[] | undefined, field: string): string[] {
+  if (!Array.isArray(value) || value.length === 0) throw new Error(`AUDIENCE_PLAN_FAILED: ${field} 不能为空。`);
+  return value;
+}

@@ -1,0 +1,35 @@
+{
+  "name": "@trycue/db",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "import": "./src/index.ts"
+    }
+  },
+  "scripts": {
+    "build": "prisma generate && tsc -p tsconfig.json",
+    "lint": "tsc -p tsconfig.json --noEmit",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "db:generate": "prisma generate --schema prisma/schema.prisma",
+    "db:migrate": "tsx src/applyMigrations.ts",
+    "db:deploy": "tsx src/applyMigrations.ts",
+    "db:seed-demo": "tsx src/seedDemo.ts"
+  },
+  "dependencies": {
+    "@prisma/client": "6.19.3",
+    "better-sqlite3": "^11.9.1"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^7.6.13",
+    "prisma": "6.19.3",
+    "tsx": "^4.20.6"
+  },
+  "prisma": {
+    "seed": "tsx src/seedDemo.ts"
+  }
+}

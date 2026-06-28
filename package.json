@@ -1,0 +1,28 @@
+{
+  "name": "trycue",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@10.4.0",
+  "scripts": {
+    "dev": "pnpm --parallel --filter @trycue/api --filter @trycue/web dev",
+    "dev:local": "powershell -ExecutionPolicy Bypass -File ./scripts/run-local.ps1",
+    "build": "pnpm -r --if-present build",
+    "lint": "pnpm -r --if-present lint",
+    "typecheck": "pnpm -r --if-present typecheck",
+    "test": "pnpm -r --if-present test",
+    "test:integration": "cross-env DATABASE_URL=file:./data/trycue_test.db pnpm --filter @trycue/db db:deploy && cross-env DATABASE_URL=file:./data/trycue_test.db pnpm --filter @trycue/api test:integration",
+    "verify": "pnpm db:generate && pnpm lint && pnpm typecheck && pnpm test && pnpm test:integration && pnpm build",
+    "db:generate": "pnpm --filter @trycue/db db:generate",
+    "db:migrate": "cross-env DATABASE_URL=file:./data/trycue.db pnpm --filter @trycue/db db:migrate",
+    "db:deploy": "cross-env DATABASE_URL=file:./data/trycue.db pnpm --filter @trycue/db db:deploy",
+    "db:seed-demo": "pnpm --filter @trycue/db db:seed-demo"
+  },
+  "devDependencies": {
+    "@types/node": "^25.9.1",
+    "cross-env": "^10.1.0",
+    "typescript": "^5.9.3"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": ["better-sqlite3"]
+  }
+}

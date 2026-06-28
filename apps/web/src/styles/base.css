@@ -1,0 +1,316 @@
+:root {
+  font-family: "Aptos", "Segoe UI", "Microsoft YaHei", sans-serif;
+  color: #26262c;
+  background: #f7f7fb;
+  letter-spacing: 0;
+  line-height: 1.5;
+  font-synthesis: none;
+  --workbench-bg: #f6f8fb;
+  --workbench-panel: rgba(255, 255, 255, 0.94);
+  --workbench-panel-strong: #fff;
+  --workbench-border: #dde3ec;
+  --workbench-border-strong: #c5cfde;
+  --workbench-text: #202432;
+  --workbench-muted: #697180;
+  --workbench-soft: #f8fafd;
+  --workbench-accent: #5f5ce8;
+  --workbench-accent-hover: #514ed7;
+  --workbench-accent-soft: #f1f0ff;
+  --paper-ink: #17201a;
+  --paper-muted: #5d6b62;
+  --paper-bg: #f7f4ec;
+  --paper-panel: rgba(255, 253, 247, 0.92);
+  --paper-panel-strong: #fffdf7;
+  --paper-line: #c8bda7;
+  --paper-plan: #806c2f;
+  --paper-new: #4b6f44;
+  --paper-run: #d85f3a;
+  --paper-identity: #246a73;
+  --paper-shadow: rgba(23, 32, 26, 0.13);
+  --paper-grid:
+    linear-gradient(90deg, rgba(23, 32, 26, 0.035) 1px, transparent 1px),
+    linear-gradient(180deg, rgba(23, 32, 26, 0.035) 1px, transparent 1px),
+    var(--paper-bg);
+  /* 页面级布局契约：统一 frame 宽度和水平 gutter */
+  --page-frame-narrow: 1180px;
+  --page-frame-wide: 1540px;
+  --page-gutter: 22px;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  /* 防止有无纵向滚动条的页面之间切换时产生水平漂移：
+     始终为滚动条预留固定 gutter，使各页居中基准一致。 */
+  scrollbar-gutter: stable;
+}
+
+body {
+  margin: 0;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+}
+
+button {
+  color: inherit;
+}
+
+.createShell,
+.venueShell,
+.settingsShell {
+  position: relative;
+  isolation: isolate;
+  min-height: 100vh;
+  overflow-x: hidden;
+  background: var(--paper-grid);
+  background-size: 28px 28px;
+}
+
+.createShell {
+  padding: 24px var(--page-gutter) 0;
+}
+
+.softOrb {
+  display: none;
+}
+
+.leftOrb {
+  left: -70px;
+  bottom: -90px;
+  width: 300px;
+  height: 300px;
+  border-radius: 48% 52% 50% 50%;
+  border: 1px solid rgba(95, 92, 232, 0.1);
+  background:
+    radial-gradient(circle at 30% 30%, rgba(255, 255, 255, 0.72), transparent 28%),
+    linear-gradient(145deg, rgba(95, 92, 232, 0.075), rgba(255, 255, 255, 0.02));
+  filter: blur(0.2px);
+}
+
+.stageOrb {
+  left: -96px;
+  bottom: -104px;
+  width: 360px;
+  height: 360px;
+  border-radius: 46% 54% 52% 48%;
+  border: 1px solid rgba(155, 134, 255, 0.22);
+  background:
+    radial-gradient(circle at 25% 23%, rgba(255, 255, 255, 0.9), transparent 22%),
+    radial-gradient(circle at 70% 64%, rgba(189, 174, 255, 0.3), transparent 18%),
+    linear-gradient(145deg, rgba(124, 97, 255, 0.14), rgba(255, 255, 255, 0.04));
+}
+
+.restoreShell {
+  display: grid;
+  align-items: start;
+  justify-items: center;
+  min-height: 100vh;
+  padding: clamp(72px, 14vh, 128px) 32px 32px;
+  background: var(--paper-grid);
+  background-size: 28px 28px;
+}
+
+.restorePanel {
+  width: min(100%, 840px);
+  border: 2px solid rgba(23, 32, 26, 0.82);
+  border-radius: 8px;
+  background: var(--paper-panel);
+  box-shadow: 5px 5px 0 var(--paper-shadow);
+  overflow: hidden;
+}
+
+.restoreHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 18px 22px;
+  border-bottom: 1px solid #ececf4;
+}
+
+.restoreHeader .kicker {
+  margin: 0;
+}
+
+.restoreHeader span {
+  color: #8a8796;
+  font-size: 12px;
+  font-weight: 720;
+}
+
+.restoreGrid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 248px;
+  gap: 34px;
+  align-items: center;
+  padding: 30px 32px 32px;
+}
+
+.restoreCopy {
+  min-width: 0;
+}
+
+.restoreMark {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 42px;
+  height: 42px;
+  margin-bottom: 16px;
+  border: 1px solid rgba(222, 80, 76, 0.2);
+  border-radius: 14px;
+  background: #fff6f5;
+  color: #de504c;
+}
+
+.restoreCopy h1 {
+  max-width: 14em;
+  margin: 0;
+  color: #202231;
+  font-size: 30px;
+  line-height: 1.14;
+}
+
+.restoreCopy p {
+  max-width: 560px;
+  margin: 12px 0 0;
+  color: #62606d;
+  font-size: 15px;
+}
+
+.restoreCopy code {
+  display: inline-block;
+  max-width: 100%;
+  margin-top: 18px;
+  padding: 8px 10px;
+  border: 1px solid #ececf4;
+  border-radius: 8px;
+  background: #fafafe;
+  color: #777483;
+  font-family: "Cascadia Mono", "Consolas", monospace;
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+
+.restoreActions {
+  display: grid;
+  gap: 10px;
+  align-self: center;
+}
+
+.restoreActions .primary,
+.restoreActions .ghostButton {
+  width: 100%;
+}
+
+.kicker {
+  margin: 0 0 3px;
+  color: var(--paper-new);
+  font-size: 12px;
+  font-weight: 760;
+  text-transform: uppercase;
+}
+
+h1 {
+  margin: 0;
+  color: var(--paper-ink);
+  font-size: 25px;
+  line-height: 1.2;
+}
+
+.simulationNote {
+  margin: 0;
+  border: 1px solid var(--paper-line);
+  border-radius: 8px;
+  background: rgba(255, 253, 247, 0.72);
+  color: var(--paper-muted);
+  padding: 8px 14px;
+  font-size: 12px;
+  box-shadow: 3px 3px 0 rgba(23, 32, 26, 0.06);
+}
+
+.errorBoundaryFallback {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 100dvh;
+  padding: 24px;
+  background: var(--workbench-bg);
+}
+
+.errorBoundaryCard {
+  max-width: 440px;
+  padding: 28px 32px;
+  background: var(--workbench-panel-strong);
+  border: 1px solid var(--workbench-border);
+  border-radius: 14px;
+  box-shadow: 0 10px 30px rgba(20, 24, 32, 0.08);
+  text-align: center;
+}
+
+.errorBoundaryCard h1 {
+  margin: 0 0 8px;
+  font-size: 20px;
+  color: var(--workbench-text);
+}
+
+.errorBoundaryCard p {
+  margin: 0 0 16px;
+  color: var(--workbench-muted);
+  font-size: 14px;
+}
+
+.errorBoundaryDetail {
+  margin: 0 0 20px;
+  padding: 10px 12px;
+  background: var(--workbench-soft);
+  border-radius: 8px;
+  color: #de504c;
+  font-size: 12px;
+  text-align: left;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.errorBoundaryActions {
+  display: flex;
+  gap: 10px;
+  justify-content: center;
+  margin-bottom: 16px;
+}
+
+.errorBoundaryActions .primary {
+  background: var(--workbench-accent);
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  padding: 8px 18px;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.errorBoundaryActions .primary:hover {
+  background: var(--workbench-accent-hover);
+}
+
+.errorBoundaryActions .ghostButton {
+  background: transparent;
+  color: var(--workbench-text);
+  border: 1px solid var(--workbench-border-strong);
+  border-radius: 8px;
+  padding: 8px 18px;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.errorBoundaryActions .ghostButton:hover {
+  background: var(--workbench-soft);
+}
+

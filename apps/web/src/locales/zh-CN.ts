@@ -1,0 +1,1218 @@
+export const zhCN = {
+  common: {
+    cancel: "取消",
+    delete: "删除",
+    save: "保存",
+    close: "关闭",
+    retry: "重试",
+    refresh: "刷新页面",
+    reset: "重置界面",
+    publish: "发布",
+    back: "返回",
+    backHome: "返回主页",
+    edit: "编辑",
+    deleting: "删除中",
+    listSeparator: "、",
+    reportSeparator: "；",
+    labelSeparator: "："
+  },
+  guard: {
+    leaveTitle: "离开当前页面？",
+    leaveBody: "有未保存的修改，离开后会丢失。确认离开吗？",
+    leaveConfirm: "离开",
+    leaveCancel: "留在当前页"
+  },
+  error: {
+    boundaryTitle: "界面出现异常",
+    boundaryBody: "当前页面发生了未预期的错误。可以尝试重置界面状态，或刷新页面。",
+    notFoundTitle: "路径不存在",
+    notFoundBody: "当前 URL 不是有效的试映页面。可以返回主页、查看历史试映或新建一次试映。",
+    notFoundHistory: "历史试映",
+    notFoundNew: "新建试映",
+    restoringTitle: "正在恢复试映",
+    restoreFailedTitle: "无法恢复当前试映",
+    restoreFailedBody: "试映任务不存在或当前服务暂时无法读取该 run。",
+    restoringBody: "正在读取当前 run 的状态和内容。"
+  },
+  status: {
+    seat: {
+      not_started: "待入席",
+      entered: "活跃中",
+      watching: "活跃中",
+      hesitating: "质疑",
+      viewing_comments: "看评论",
+      liked: "点赞",
+      favorited: "收藏",
+      commented: "评论",
+      skipped: "跳过",
+      risk_exit: "质疑退出",
+      finished: "完成",
+      failed: "失败"
+    },
+    lifecycle: {
+      not_started: "未开始",
+      failed: "失败",
+      left: "已离开",
+      active: "进行中"
+    },
+    run: {
+      planning_audience: "规划观众席",
+      generating_audience: "生成观众中",
+      audience_ready: "观众待入场",
+      pausing: "正在暂停",
+      paused: "AI 试映已暂停",
+      completed: "试映已结束 · 现场回看",
+      report_generating: "试映已结束 · 现场回看",
+      running: "AI 试映中"
+    },
+    historyRun: {
+      draft: "草稿",
+      planning_audience: "规划观众",
+      generating_audience: "生成观众",
+      audience_ready: "待开始",
+      running: "运行中",
+      pausing: "暂停中",
+      paused: "已暂停",
+      report_generating: "已完成",
+      completed: "已完成"
+    },
+    historyAction: {
+      viewReport: "查看报告",
+      reviewData: "回看现场数据",
+      viewReportGenerating: "查看报告生成中",
+      backToVenue: "回到现场",
+      openVenue: "打开现场",
+      startRun: "开始试映",
+      viewProgress: "查看生成进度",
+      continuePrep: "继续准备",
+      continueEdit: "继续编辑"
+    },
+    identity: {
+      ready: "已就绪",
+      generating: "生成中",
+      failed: "生成失败",
+      queued: "排队中",
+      pending: "画像待生成"
+    }
+  },
+  console: {
+    loadedN: "已载入 {{count}}",
+    liveLogs: "实时日志",
+    runningLogs: "运行日志",
+    collapseLogs: "收起日志",
+    expandLogs: "展开日志",
+    waiting: "等待",
+    empty: "暂无日志",
+    loadMore: "加载更多日志",
+    allLoaded: "已显示全部日志",
+    filter: {
+      all: "全部",
+      generation: "生成",
+      dispatch: "调度",
+      thought: "思考",
+      action: "动作",
+      result: "结果",
+      waiting: "等待",
+      comment: "评论",
+      control: "控制",
+      exception: "异常"
+    }
+  },
+  recommendation: {
+    recommend_publish: "建议发布",
+    modify_then_publish: "修改后发布",
+    not_recommend_current_version: "不建议当前版本发布",
+    recommend_retest: "建议重测"
+  },
+  dimension: {
+    firstImpression: "首屏吸引",
+    value: "收藏价值",
+    interactionIntent: "互动意愿",
+    trust: "信任证据",
+    risks: "风险信号"
+  },
+  commentPreview: {
+    question: "追问",
+    doubt: "质疑",
+    resonance: "共鸣",
+    professional: "专业反驳"
+  },
+  audience: {
+    profileSummary: "观众设定：{{label}}",
+    profileSummaryEmpty: "观众设定待补充",
+    unnamed: "未命名观众",
+    reportValue: {
+      target: "修改位置：{{value}}",
+      problem: "问题：{{value}}",
+      direction: "建议：{{value}}",
+      example: "示例：{{value}}",
+      evidence: "证据：{{value}}"
+    }
+  },
+  simulation: {
+    note: "以下互动为 AI 试映模拟结果，不代表真实平台数据。"
+  },
+  report: {
+    unit: {
+      people: "人",
+      count: "条"
+    },
+    metric: {
+      exposedActors: "曝光人数",
+      openedActors: "点开人数",
+      readActors: "阅读人数",
+      deepReadActors: "深度阅读人数",
+      readFullActors: "完整阅读人数",
+      readSkimActors: "快速浏览人数",
+      readPartialActors: "部分阅读人数",
+      likedActors: "点赞人数",
+      favoritedActors: "收藏人数",
+      commentedActors: "评论人数",
+      sharedActors: "分享人数",
+      viewedCommentsActors: "查看评论人数",
+      positiveActionActors: "正向行为人数",
+      exitedActors: "离开人数"
+    },
+    section: {
+      comments: "评论区预演",
+      risks: "风险与修改建议",
+      verdict: "发布建议",
+      decisionSummary: "发布决策摘要",
+      keyFindings: "关键发现",
+      rewriteSuggestions: "直接改稿建议",
+      funnel: "行为漏斗",
+      mainBlocker: "最大阻断点",
+      audienceGroup: "抽样组反应分析",
+      segments: "人群分组",
+      diagnostics: "内容诊断",
+      keepAndChange: "保留项 / 修改项",
+      revisionPlan: "修改计划",
+      retestPlan: "下一轮重测重点",
+      evidence: "证据库"
+    },
+    decisionSummary: {
+      coreProblem: "核心问题",
+      p0Actions: "P0 必改项",
+      p1Actions: "P1 建议优化",
+      keepItems: "可保留项"
+    },
+    keyFinding: {
+      finding: "发现",
+      evidence: "证据",
+      impact: "影响",
+      action: "动作",
+      empty: "暂无关键发现"
+    },
+    verdict: {
+      confidence: "结论信心",
+      headline: "摘要",
+      oneSentence: "一句话结论",
+      topOpportunity: "最大机会",
+      topRisk: "最大风险",
+      priorityFix: "优先修复",
+      confidenceHigh: "高",
+      confidenceMedium: "中",
+      confidenceLow: "低"
+    },
+    funnel: {
+      openRate: "点开率",
+      readRateAfterOpen: "点开后阅读率",
+      deepReadRateAfterOpen: "点开后深度阅读率",
+      favoriteRateAfterOpen: "点开后收藏率",
+      commentRateAfterOpen: "点开后评论率",
+      shareRateAfterOpen: "点开后分享率",
+      positiveActionRate: "正向行为率",
+      audienceCount: "试映观众",
+      completedCount: "完成观众",
+      failedCount: "失败观众"
+    },
+    blocker: {
+      affectedCount: "影响人数",
+      severity: "严重程度",
+      diagnosis: "诊断",
+      summary: "概要",
+      severityHigh: "高",
+      severityMedium: "中",
+      severityLow: "低"
+    },
+    audienceGroup: {
+      coreTargetHit: "核心目标人群命中",
+      coreTargetHighInterestLowTrust: "核心目标人群高兴趣低信任",
+      peripheralExpansionOpportunity: "外围人群扩展机会",
+      contrastSkipExpected: "对照组流失符合预期",
+      contrastUnexpectedRisk: "对照组出现非预期风险",
+      crossGroupSummary: "组间对比",
+      noGroups: "无抽样组数据",
+      exitReasons: "离开原因",
+      commentIntents: "评论意图",
+      targetAudienceFit: "目标命中度",
+      modificationWeight: "反馈权重",
+      handlingSuggestion: "处理建议",
+      typicalMotivation: "典型动机",
+      mainBarrier: "主要阻力",
+      behaviorEvidence: "行为证据",
+      fitHigh: "高",
+      fitMedium: "中",
+      fitLow: "低",
+      weightHigh: "高",
+      weightMedium: "中",
+      weightLow: "低",
+      role: {
+        core_target: "核心目标",
+        peripheral_target: "外围目标",
+        contrast: "对照组",
+        exploratory: "探索性",
+        unknown: "未知"
+      }
+    },
+    segment: {
+      persuaded: "被打动的人",
+      interested_but_not_convinced: "高兴趣低信任的人",
+      skipped: "直接流失的人",
+      skeptical: "质疑/反驳的人",
+      size: "人数",
+      percentage: "占比",
+      summary: "判断",
+      commonTraits: "共同特征",
+      suggestedAction: "建议行动",
+      representativeThoughts: "代表性想法",
+      representativeComments: "代表性评论",
+      empty: "暂无该人群"
+    },
+    diagnostic: {
+      feed_attraction: "信息流吸引力",
+      reading_retention: "正文留存力",
+      trust_evidence: "信任证据",
+      save_value: "收藏价值",
+      comment_risk: "评论风险与机会",
+      status: "状态",
+      finding: "判断",
+      evidence: "证据",
+      reason: "原因",
+      suggestedFix: "建议",
+      statusStrong: "强",
+      statusMedium: "中等",
+      statusWeak: "偏弱",
+      statusRisk: "风险"
+    },
+    keepAndChange: {
+      keep: "应该保留",
+      change: "应该修改",
+      item: "项目",
+      reason: "原因",
+      empty: "暂无"
+    },
+    revisionPlan: {
+      priority: "优先级",
+      title: "标题",
+      action: "行动",
+      reason: "原因",
+      affectedSegment: "影响人群",
+      expectedImpact: "预期效果",
+      retestQuestion: "重测问题",
+      empty: "暂无修改计划",
+      affectedSegmentOverall: "整体"
+    },
+    retestPlan: {
+      question: "下轮测试目标",
+      hypothesis: "实验假设",
+      testVersionLabel: "建议测试版本",
+      relatedAction: "关联行动",
+      metricToWatch: "观察指标",
+      expectedDirection: "预期方向",
+      empty: "暂无重测重点"
+    },
+    rewrite: {
+      recommendedTitles: "推荐标题",
+      recommendedCoverText: "推荐封面文字",
+      recommendedOpening: "推荐正文开头",
+      recommendedBodyStructure: "推荐正文结构",
+      recommendedCommentPrompt: "推荐评论引导",
+      recommendedTags: "推荐标签",
+      why: "为什么这样改",
+      copy: "复制",
+      copied: "已复制",
+      empty: "暂无改稿建议"
+    },
+    chart: {
+      section: "核心图表",
+      funnel: {
+        title: "行为漏斗图",
+        caption: "累计/递进口径：每一步都是人数，后续步骤是前一步的子集。",
+        stageExposed: "进入测试",
+        stageOpened: "点击进入",
+        stageRead: "发生阅读",
+        stageDeepRead: "深度阅读",
+        stageReadFull: "完整阅读",
+        stagePositiveAction: "产生正向行为",
+        stageCommented: "评论",
+        dropHint: "较上一阶段减少 {{count}} 人",
+        noDrop: "无流失",
+        commentEvents: "共 {{count}} 条评论",
+        empty: "当前样本不足，暂不生成该图表。需要至少 3 个有效参与者。",
+        interpOpenLow: "点击进入偏低，标题/封面吸引力不足。",
+        interpSkimHigh: "标题能带来点击，但进入后快速浏览人数偏多，正文开头没有迅速兑现标题承诺。",
+        interpFullLow: "正文承接尚可，但完整阅读人数不足，内容价值未被充分认可。",
+        interpStable: "整体漏斗表现平稳，可关注互动和收藏环节的提升空间。"
+      },
+      readDepth: {
+        title: "阅读深度分布图",
+        caption: "用户到底是扫了一眼、读了一半，还是读完了。",
+        empty: "当前样本不足，暂不生成该图表。",
+        interpSkimHigh: "快速浏览人数高于完整阅读人数，问题主要出在正文开头承接。",
+        interpFullHigh: "完整阅读人数最多，内容价值被认可，可关注互动引导。",
+        interpPartialHigh: "部分阅读人数最多，主题有兴趣但内容承接不足。"
+      },
+      audienceMatrix: {
+        title: "目标人群命中矩阵",
+        caption: "谁的反馈更值得听。",
+        axisFit: "目标人群命中度",
+        axisEngagement: "内容反应强度",
+        quadHighFitHighEngage: "核心机会人群",
+        quadHighFitLowEngage: "优先修复人群",
+        quadLowFitHighEngage: "意外扩展人群",
+        quadLowFitLowEngage: "低参考权重人群",
+        fitHigh: "高",
+        fitMedium: "中",
+        fitLow: "低",
+        engageHigh: "高",
+        engageMedium: "中",
+        engageLow: "低",
+        empty: "无人群数据，暂不生成该图表。"
+      },
+      priorityMatrix: {
+        title: "问题优先级矩阵",
+        caption: "先改什么。",
+        axisImpact: "影响程度",
+        axisCost: "修改成本",
+        quadHighImpactLowCost: "马上改",
+        quadHighImpactHighCost: "重点规划",
+        quadLowImpactLowCost: "顺手改",
+        quadLowImpactHighCost: "暂不改",
+        impactHigh: "高",
+        impactMedium: "中",
+        impactLow: "低",
+        costHigh: "高",
+        costMedium: "中",
+        costLow: "低",
+        empty: "无修改计划，暂不生成该图表。"
+      },
+      interpretation: "解读"
+    },
+    evidence: {
+      drawerTitle: "证据详情",
+      empty: "暂无证据",
+      openDrawer: "查看证据",
+      closeDrawer: "关闭",
+      typeMetric: "指标",
+      typeThought: "想法",
+      typeComment: "评论",
+      typeToolCall: "工具调用",
+      typeJourney: "观众旅程",
+      typeSegment: "人群",
+      typeBlocker: "阻断点",
+      typeGroup: "抽样组",
+      participant: "参与者"
+    },
+    evidenceQuality: {
+      low: "证据质量不足",
+      lowHint: "当前试映证据不足以做出可靠判断，建议扩大样本重测。",
+      medium: "证据质量中等",
+      high: "证据质量良好"
+    },
+    regenerate: "重新生成报告",
+    regenerating: "正在重新生成...",
+    runInfo: "运行信息",
+    generatedAt: "生成时间",
+    promptVersion: "Prompt 版本",
+    model: "模型",
+    runId: "运行 ID",
+    modelUnknown: "未知，需检查运行记录",
+    metricDict: {
+      readSkim: {
+        label: "快速浏览",
+        description: "只扫了几眼或短暂停留的观众人数（按人去重）。"
+      },
+      readPartial: {
+        label: "部分阅读",
+        description: "读了一部分后离开的观众人数（按人去重）。"
+      },
+      readFull: {
+        label: "完整阅读",
+        description: "基本读完整篇内容的观众人数（按人去重）。"
+      },
+      exposed: {
+        label: "曝光人数",
+        description: "进入试映的观众人数，是漏斗最上层数字。"
+      },
+      opened: {
+        label: "点开人数",
+        description: "进入内容详情页的观众人数，说明标题有初步吸引力。"
+      },
+      viewedComments: {
+        label: "查看评论人数",
+        description: "点开评论区的观众人数，通常说明内容引发了进一步了解动机。"
+      },
+      liked: {
+        label: "点赞人数",
+        description: "点赞的观众人数（每人只算一次）。"
+      },
+      favorited: {
+        label: "收藏人数",
+        description: "收藏的观众人数（每人只算一次），反映内容的工具/复查价值。"
+      },
+      commented: {
+        label: "评论人数",
+        description: "发表过评论的观众人数（按人去重，一人可写多条评论）。"
+      },
+      shared: {
+        label: "分享人数",
+        description: "分享的观众人数（按人去重），反映内容的传播价值。"
+      },
+      exited: {
+        label: "离开人数",
+        description: "结束浏览的观众人数。结合阅读深度和离开原因可判断是正常离开还是风险离开。"
+      },
+      openRate: {
+        label: "点开率",
+        description: "点开人数 / 曝光人数，反映标题与封面的吸引力。"
+      },
+      readRateAfterOpen: {
+        label: "点开后阅读率",
+        description: "阅读人数 / 点开人数，反映正文开头的承接力。"
+      },
+      favoriteRateAfterOpen: {
+        label: "点开后收藏率",
+        description: "收藏人数 / 点开人数，反映内容的工具/复查价值。"
+      },
+      commentRateAfterOpen: {
+        label: "点开后评论率",
+        description: "评论人数 / 点开人数，反映内容的表达激发力。"
+      },
+      shareRateAfterOpen: {
+        label: "点开后分享率",
+        description: "分享人数 / 点开人数，反映内容的传播价值。"
+      },
+      positiveActionRate: {
+        label: "正向行为率",
+        description: "至少做过正向行为的人数 / 点开人数，综合反映内容激发互动的能力。"
+      }
+    }
+  },
+  venueHud: {
+    aiSimulation: "AI 模拟",
+    simProgress: "模拟进度",
+    simTime: "模拟时间",
+    skipN: "跳过 {{count}}",
+    failN: "失败 {{count}}",
+    resetRun: "重置试映",
+    viewReport: "查看报告",
+    endAndReport: "结束并生成报告",
+    backHome: "返回主页",
+    resume: "继续试映",
+    pausing: "正在暂停",
+    pause: "暂停",
+    completed: "试映已结束",
+    waiting: "等待试映",
+    resetRuntimeTitle: "重置试映运行数据",
+    resetRuntimeDisabledRunning: "试映运行中不可重置",
+    resetRuntimeDisabledPausing: "正在暂停，不可重置",
+    resetRuntimeDisabledOther: "当前状态不可重置",
+    reportTitlePaused: "结束当前试映并生成阶段报告",
+    reportTitleCompleted: "查看完整试映报告",
+    reportTitleDisabled: "试映暂停或完成后可用"
+  },
+  venue: {
+    audienceSeat: "观众席",
+    runtimeLog: "运行日志",
+    audiencePanel: "AI 观众席",
+    currentActive: "当前活跃",
+    noMatch: "暂无匹配观众",
+    drawerTitle: "观众详情",
+    closeDetail: "关闭详情",
+    closeEdit: "关闭编辑",
+    drawerLoading: "加载中...",
+    drawer: {
+      roleBackground: "角色背景",
+      personality: "性格特征",
+      mbti: "MBTI",
+      responseStyle: "表达风格",
+      finalFeedback: "最终反馈",
+      comments: "本次评论",
+      noComments: "暂无评论。",
+      timeline: "行为与思考时间线",
+      noTimeline: "暂无时间线事件。",
+      noBehavior: "暂无行为",
+      exitReasonCategory: "离开原因",
+      exitReadingDepth: "阅读深度",
+      exitInterestLevel: "兴趣程度",
+      exitTrustLevel: "信任程度",
+      commentIntent: "评论意图"
+    },
+    exitReasonCategory: {
+      not_relevant: "与我不相关",
+      not_interested: "兴趣不足",
+      low_trust: "信任感低",
+      too_ad_like: "广告感强",
+      content_too_long: "内容过长",
+      need_more_evidence: "证据不足",
+      finished_normally: "正常结束",
+      no_more_action: "没有更多动作"
+    },
+    readingDepth: {
+      feed_only: "只看了信息流",
+      skimmed: "快速扫读",
+      partial: "看了部分",
+      full: "基本看完"
+    },
+    level: {
+      low: "低",
+      medium: "中",
+      high: "高"
+    },
+    commentIntent: {
+      ask: "提问",
+      doubt: "质疑",
+      share_experience: "分享经验",
+      agree: "认同",
+      joke: "玩笑",
+      pushback: "反驳"
+    },
+    legend: {
+      active: "进行中",
+      left: "已离开",
+      failed: "失败",
+      doubt: "质疑",
+      comment: "评论",
+      favorite: "收藏",
+      share: "分享",
+      like: "点赞",
+      open: "点开"
+    },
+    legendAria: "观众席图例",
+    comment: {
+      allCount: "共 {{count}} 条评论",
+      burst: "+{{delta}} 条新评论",
+      hot: "最热",
+      latest: "最新",
+      placeholder: "说点什么...",
+      placeholderClosed: "试映已结束，评论已关闭",
+      ariaLabel: "评论内容",
+      loadMore: "加载更多评论",
+      allLoaded: "已显示全部评论",
+      like: "点赞评论",
+      unlike: "取消点赞评论",
+      reply: "回复",
+      minuteAgo: "1 分钟前",
+      replies: "{{count}} 条回复"
+    },
+    action: {
+      unlike: "取消点赞",
+      like: "点赞",
+      unfavorite: "取消收藏",
+      favorite: "收藏",
+      share: "分享"
+    },
+    post: {
+      redBook: "小红书",
+      follow: "关注",
+      author: "陈琳",
+      prevImage: "上一张图片",
+      nextImage: "下一张图片",
+      tapToZoom: "点击查看",
+      expandBody: "展开正文",
+      collapseBody: "收起正文",
+      imageHidden: "图片已隐藏",
+      contentImageAlt: "试映内容图片",
+      contentPreview: "试映内容预览",
+      simulatedPage: "小红书模拟试映页"
+    },
+    timeline: {
+      thought: "思考",
+      action: "动作",
+      comment: "评论",
+      exception: "异常",
+      result: "结果"
+    },
+    exitOutcome: {
+      skipped: "跳过",
+      browsed_and_left: "浏览后离开",
+      risk_exit: "质疑退出",
+      max_steps: "达到步数上限"
+    },
+    resetRun: "试映运行数据已重置",
+    resetRunTitle: "重置试映运行数据？",
+    resetRunBody: "将清除本次试映的运行日志、互动记录、评论、报告和行为计数，内容和观众人设保留不变。重置后可重新开始试映。",
+    resetRunConfirm: "重置试映",
+    startWithReadyTitle: "只让已就绪观众开始试映？",
+    startWithReadyBody: "已有 {{ready}} 位观众人设可参与试映，还有 {{missing}} 位观众未生成人设，不会参与本次试映。",
+    startWithReadyConfirm: "继续开始",
+    reportTitle: "试映报告",
+    reportBackHome: "返回主页",
+    reportReviewData: "回看现场数据",
+    reportNotAvailable: "报告尚不可用，请回看现场数据查看当前 run 状态。",
+    reportLoading: "加载报告中..."
+  },
+  home: {
+    title: "AI 用户试映工作台",
+    history: "历史试映",
+    settings: "设置",
+    field: {
+      title: "标题",
+      cover: "封面图",
+      body: "正文"
+    },
+    image: {
+      upload: "上传图片",
+      selectCount: "选择图片 {{current}}/{{max}}",
+      addMore: "继续添加 {{current}}/{{max}}",
+      limitHint: "超过 {{bytes}} 会先压缩到限制以内，最长边不超过 {{edge}}px。",
+      uploadFailed: "图片上传失败",
+      maxImages: "最多上传 {{max}} 张图片",
+      processing: "正在处理图片"
+    },
+    publishTitle: "发布到 AI 试映场",
+    publishBody: "AI 观众会以不同人设进入现场，模拟点开、收藏、评论、质疑和跳过等过程信号。",
+    useDemo: "使用演示内容",
+    demoOverwrite: {
+      title: "用演示内容覆盖当前草稿？",
+      body: "当前已有草稿内容，会被演示标题、正文和图片替换。页面切换会保留草稿，只有确认覆盖才会修改。",
+      confirm: "覆盖草稿",
+      cancel: "保留当前草稿"
+    },
+    generate: "生成 AI 观众席",
+    preset: {
+      quick: "快速试映",
+      quickDesc: "12 位观众",
+      standard: "标准试映",
+      standardDesc: "30 位观众",
+      custom: "自定义观众数",
+      customDesc: "{{count}} 位观众"
+    },
+    audienceCount: "观众数",
+    audienceCountAria: "自定义观众数",
+    audienceCountHigh: "观众数较高，会显著增加模型调用和等待时间，建议只在最终验收前使用。",
+    audienceCountRange: "可设置 {{min}}-{{max}} 位；快速探索建议先控制在 100 位以内。"
+  },
+  audienceGen: {
+    title: {
+      planFailed: "观众结构生成失败",
+      planning: "规划观众结构",
+      generating: "生成试映观众",
+      confirm: "确认试映观众",
+      review: "审阅采样计划"
+    },
+    status: {
+      failed: "生成失败",
+      generating: "生成中",
+      ready: "可开始",
+      pending: "待审阅"
+    },
+    action: {
+      clearAudience: "清空观众",
+      askAI: "问 AI",
+      retryFailed: "重试失败人设",
+      confirmAndGenerate: "确认计划并生成人设",
+      resetRun: "重置试映",
+      startRun: "开始试映"
+    },
+    runtimeTitle: {
+      planFailed: "观众结构生成失败",
+      planning: "正在规划观众结构",
+      progress: "观众生成进度",
+      review: "采样计划审阅"
+    },
+    runtimeDock: "观众生成运行席",
+    generated: "已生成",
+    planned: "已规划",
+    dimension: "拆分维度",
+    dimensionGenerating: "拆分维度生成中",
+    planNote: "计划说明",
+    planNoteGenerating: "计划说明生成中",
+    directive: {
+      groupN: "第 {{index}} 组",
+      name: "人群名称",
+      quantity: "人数",
+      description: "人群描述",
+      diversityAxes: "组内差异方向",
+      rationale: "为什么这样分配",
+      reason: "理由：",
+      target: "目标 {{count}} 人",
+      people: "人",
+      namePlaceholder: "未填写人群名称",
+      diversityEmpty: "未填写",
+      diversityAddPlaceholder: "输入后按 Enter 添加",
+      diversityAdd: "添加",
+      diversityAria: "已添加的组内差异方向",
+      diversityRemove: "移除{{axis}}",
+      diversityNew: "新增组内差异方向",
+      previewName: "预览分组 {{name}}",
+      previewGenerating: "预览分组生成中",
+      nameGenerating: "人群名称生成中",
+      descGenerating: "人群描述生成中",
+      reasonGenerating: "分配理由生成中",
+      countGenerating: "分组人数生成中",
+      countAssigning: "人数分配中",
+      coverageJumpAria: "跳转到第 {{index}} 组 {{name}}",
+      identityReadyAria: "{{ready}} / {{total}} 人"
+    },
+    review: {
+      complete: "已完成",
+      incomplete: "字段不完整",
+      generating: "生成中"
+    },
+    confirm: {
+      replanTitle: "重新规划观众结构？",
+      replanBody: "当前未入场观众结构、已生成人设和保存状态会被替换。这个操作适合在覆盖方向明显不对时使用。",
+      replanConfirm: "重新规划",
+      clearTitle: "清空观众？",
+      clearBody: "将删除当前已生成的画像和人设，保留已确认的观众结构，并回到结构审阅。之后你可以继续编辑结构，或重新规划整份结构。",
+      clearConfirm: "清空观众",
+      deleteDirectiveTitle: "删除这类人群？",
+      deleteDirectiveBody: "将从采样计划中删除「{{description}}」。删除后需要重新检查总人数是否仍等于目标人数。",
+      deleteDirectiveConfirm: "删除人群",
+      deleteAudienceTitle: "删除这个观众？",
+      deleteAudienceBody: "将删除「{{label}}」及其关联的人设、身份和后续运行记录入口。这个操作适合在采样重复或明显不需要时使用。",
+      deleteAudienceConfirm: "删除观众",
+      regenerateTitle: "重新生成这个人设？",
+      regenerateTitlePending: "生成这个画像的人设？",
+      regenerateBodyReady: "将重新生成「{{label}}」的人设内容，当前背景、性格、MBTI 和响应风格会被新结果替换。",
+      regenerateBodyPending: "将基于「{{label}}」的采样信息生成一个具体人设。生成过程中该画像会进入排队或生成状态。",
+      regenerateConfirmReady: "重新生成",
+      regenerateConfirmPending: "生成人设"
+    },
+    toast: {
+      cleared: "已清空观众",
+      saved: "人群计划项已保存",
+      deleted: "已删除人群",
+      reset: "试映运行数据已重置",
+      planFailed: "采样计划未生成或上次生成失败，请重新规划。",
+      planError: "采样计划生成失败。请重新生成整份计划。",
+      maxImages: "最多上传 {{max}} 张图片",
+      imageFailed: "图片上传失败",
+      invalidQuantity: "人群数量必须是大于 0 的整数",
+      emptyName: "人群名称不能为空",
+      emptyDesc: "人群描述不能为空",
+      emptyDiversity: "至少填写一个组内差异方向",
+      emptyRationale: "分配理由不能为空",
+      appliedAdd: "已应用：新增人群",
+      appliedAddResult: "已新增到采样计划",
+      appliedUpdate: "已应用：修改人群",
+      appliedUpdateResult: "已更新采样计划",
+      appliedDelete: "已应用：删除人群",
+      appliedDeleteResult: "已从采样计划删除",
+      appliedAddProfile: "已应用：新增观众",
+      appliedAddProfileResult: "已新增观众并开始生成人设",
+      appliedUpdateProfile: "已应用：修改观众",
+      appliedUpdateProfileResult: "已更新观众人设",
+      appliedRegenerate: "已应用：重生人设",
+      appliedRegenerateResult: "已开始重生人设",
+      appliedDeleteProfile: "已应用：删除观众",
+      appliedDeleteProfileResult: "已删除观众",
+      appliedFavorite: "已应用：收藏人设",
+      appliedUnfavorite: "已应用：取消收藏",
+      appliedFavoriteResult: "已收藏人设",
+      appliedUnfavoriteResult: "已取消收藏",
+      appliedRetry: "已应用：重试失败人设",
+      appliedRetryResult: "已开始重试人设",
+      cannotOptimizePlan: "当前状态不能优化观众分布",
+      cannotPolishSeat: "当前状态不能打磨观众人设",
+      sseError: "收到无法解析的实时事件，已忽略该事件并继续同步。",
+      refreshFailed: "现场数据刷新失败：{{errors}}",
+      updating: "正在更新",
+      applyFailed: "应用失败"
+    },
+    reasoning: {
+      thinking: "思考中",
+      thinkingTokens: "思考中 {{prefix}}{{count}} token",
+      planning: "规划中",
+      replan: "重新规划"
+    },
+    quantityDelta: {
+      more: "多 {{count}}",
+      less: "缺 {{count}}",
+      unsaved: "含未保存编辑",
+      unsavedWithDelta: "含未保存编辑，{{delta}}"
+    },
+    expansion: {
+      generating: "正在展开画像，请稍候…",
+      failed: "画像展开失败",
+      queued: "画像排队生成中…"
+    },
+    detail: {
+      toggleFavorite: "收藏人设",
+      toggleUnfavorite: "取消收藏人设",
+      regenerate: "重新生成人设",
+      delete: "删除",
+      retry: "重试",
+      generate: "生成",
+      retryIdentity: "重试身份",
+      generateIdentity: "生成人设",
+      deleteAria: "删除 {{name}}",
+      detailAria: "{{name}}观众详情"
+    },
+    assistant: {
+      planTitle: "优化观众分布",
+      seatTitle: "打磨观众人设",
+      planSubtitle: "先看调整建议，再决定是否采纳。",
+      seatSubtitle: "先看观众调整建议，再决定是否采纳。",
+      planPlaceholder: "描述想补充、拆分或删减的人群",
+      seatPlaceholder: "描述想调整、重生或保留的观众"
+    }
+  },
+  history: {
+    title: "历史试映",
+    backHome: "返回主页",
+    loading: "加载历史中...",
+    emptyTitle: "还没有历史试映",
+    emptyBody: "当前没有可恢复的试映记录",
+    newRun: "新建试映",
+    bodyPreviewEmpty: "暂无正文预览",
+    identityReady: "人设就绪",
+    participants: "位观众",
+    hasReport: "已有报告",
+    loadMore: "加载更多",
+    deleted: "试映已删除",
+    delete: {
+      title: "删除这次试映？",
+      irrecoverable: "不可恢复操作",
+      body: "「{{title}}」的报告、日志、评论、观众人设和本地上传资源会被清理，删除后不可恢复。",
+      confirm: "删除",
+      tooltip: "删除试映",
+      tooltipDisabled: "运行中或报告生成中的试映不能直接删除"
+    },
+    listAria: "历史试映列表"
+  },
+  settings: {
+    title: "模型与网关设置",
+    backHome: "返回主页",
+    saveSettings: "保存设置",
+    saving: "保存中",
+    saved: "已保存",
+    loadingSettings: "加载设置中...",
+    tabs: {
+      aria: "设置分类",
+      ai: "AI 设置",
+      system: "系统设置"
+    },
+    model: {
+      title: "模型设置",
+      runtimeMode: "运行模式",
+      mock: "Mock 模式",
+      mockDesc: "本地模拟，不调用真实模型",
+      real: "Real 模式",
+      realDesc: "使用 API key、base URL 和模型配置",
+      apiKey: "API key",
+      apiKeyModified: "已修改",
+      baseUrl: "API base URL",
+      baseUrlPlaceholder: "必填，例如 https://api.openai.com/v1",
+      fetchModels: "获取模型列表",
+      modelsCount: "{{count}} 个可选模型",
+      modelsEmpty: "填写真实模式的 base URL 和 key 后请求 /models",
+      fast: "快速模型",
+      fastPlaceholder: "用于批量生成和试映运行",
+      fastUsage1: "画像展开",
+      fastUsage2: "人设批量生成",
+      fastUsage3: "试映中观众行为回合",
+      pro: "Pro 模型",
+      proHint: "需支持图片输入",
+      proPlaceholder: "用于图片理解、计划、问答和报告",
+      proUsage1: "采样计划",
+      proUsage2: "优化观众分布",
+      proUsage3: "打磨观众人设",
+      proUsage4: "试映报告",
+      noMatch: "没有匹配模型",
+      listAria: "{{label}}模型列表",
+      usageAria: "模型使用场景",
+      restoreDefault: "恢复默认设置",
+      restoreTooltip: "恢复 API key、模型配置和运行模式到默认值，此操作会清除当前已保存的模型设置。",
+      restoreTitle: "恢复默认设置？",
+      restoreBody: "当前 API key、模型配置和运行模式将全部重置为默认值，此操作不可撤销。",
+      restoreConfirm: "确认恢复",
+      restoreCancel: "保留当前设置",
+      savedMock: "当前选择 Mock 运行",
+      savedReal: "当前选择真实模型运行",
+      savedToast: "模型设置已保存，{{mode}}"
+    },
+    capacity: {
+      title: "调用容量控制",
+      refresh: "刷新容量状态",
+      refreshTooltip: "刷新当前模型调用容量、并发和限流状态。",
+      statusAria: "LLM 调用运行状态",
+      statusLabel: "运行状态",
+      effectiveRpm: "实际 RPM",
+      effectiveConcurrency: "实际并发",
+      configuredMaxRpm: "配置上限 {{count}}",
+      configuredMaxConcurrency: "配置上限 {{count}}",
+      inFlight: "运行中",
+      queueSize: "等待中",
+      cooldownUntil: "冷却至 {{time}}",
+      recentLimit: "最近限流 {{count}} 次{{reason}}",
+      mode: "调用策略",
+      modeAuto: "自动（推荐）",
+      modeManual: "手动",
+      modeAutoDesc: "系统根据校准结果自动调节 RPM 和并发，运行中动态适应限流",
+      modeManualDesc: "使用固定的 RPM 和并发上限，适合已知模型额度的场景",
+      probe: "校准当前模型",
+      probing: "校准中...",
+      resetLearning: "重置学习结果",
+      preset: {
+        conservative: "保守",
+        standard: "标准",
+        high_quota: "高额度",
+        custom: "自定义"
+      },
+      probeResult: "校准结果",
+      probeSummary: "推荐采用并发 {{concurrency}}：该档实测 RPM {{rpm}}，运行值按 75% 安全余量取 RPM {{recommended}}。",
+      probeRecommendedRpm: "推荐 RPM",
+      probeRecommendedConcurrency: "推荐并发",
+      probeAvgLatency: "平均延迟",
+      probeTokens: "消耗 Token",
+      probeTestedRpm: "测试 RPM",
+      probeTestedConcurrency: "测试并发",
+      appliedRecommended: "已应用推荐值",
+      applyRecommended: "应用推荐值",
+      advanced: "高级设置",
+      presetSection: "容量预设",
+      presetAria: "容量预设",
+      boundary: "数值边界",
+      initialRpm: "初始 RPM",
+      minRpm: "最低 RPM",
+      maxRpm: "最大 RPM",
+      initialConcurrency: "初始并发",
+      minConcurrency: "最低并发",
+      maxConcurrency: "最大并发",
+      maxRetries: "最大重试",
+      probeProgressAria: "校准进度",
+      probePreparing: "准备中",
+      probeCooling: "冷却中",
+      probeTesting: "校准中",
+      probeCooldownLeft: "{{time}} 后测试 {{level}}",
+      probeLevelRemaining: "{{level}} · {{time}} 后结束本档",
+      probeCancel: "取消校准",
+      probeCurrentSent: "本档请求 {{count}}",
+      probeCurrentSuccess: "本档成功 {{count}}",
+      probeCurrentFailed: "本档失败 {{count}}",
+      probeCurrentTokens: "本档 Token {{count}}",
+      probeCurrentElapsed: "本档耗时 {{time}}",
+      probeCurrentLatency: "本档延迟 {{latency}}",
+      probeCurrentLatencyNone: "本档延迟 未返回",
+      probeTotalSent: "累计请求 {{count}}",
+      probeTotalTokens: "累计 Token {{count}}",
+      probeLevelHeader: "已完成档位",
+      probeLevelHint: "用于对比不同并发下的真实吞吐",
+      probeLevelConcurrency: "并发",
+      probeLevelRequests: "请求",
+      probeLevelSuccess: "成功",
+      probeLevelFailed: "失败",
+      probeLevelRpm: "RPM",
+      probeLevelSuccessRate: "成功率",
+      probeLevelLatency: "延迟",
+      probeLevelTokens: "Token",
+      probeLevelRecommended: "推荐",
+      probeLevelNone: "未返回",
+      probeLevelTableAria: "已完成档位结果",
+      probeConfirmTitle: "校准当前模型？",
+      probeConfirmBody: "校准会按并发档位真实发送请求，每档约 60 秒，档间会等待限流窗口恢复，可能持续数分钟并产生 API 费用。高额度或自定义上限可能消耗约 10-30 万 Token；系统会使用极短 prompt 和 1 token 输出降低成本。",
+      probeConfirmLabel: "开始校准",
+      probeCancelled: "校准已取消，未应用任何推荐值",
+      probeCompleted: "校准完成：推荐 RPM {{rpm}}，并发 {{concurrency}}",
+      probeFailed: "校准失败",
+      resetConfirmTitle: "重置自动学习结果？",
+      resetConfirmBody: "当前 RPM 和并发将回到初始值，已积累的成功计数和限流记录将被清除。",
+      resetConfirmLabel: "重置",
+      resetDone: "已重置自动学习结果",
+      appliedToast: "已应用推荐值：实际 RPM {{rpm}}，实际并发 {{concurrency}}。探测上限 RPM {{testedRpm}}，并发 {{testedConcurrency}} 已作为自动模式上限。"
+    },
+    guard: {
+      title: "离开设置页？",
+      body: "有未保存的设置改动，离开后会丢失。确认离开吗？",
+      confirm: "离开",
+      cancel: "留在设置页"
+    },
+    saveConfirmTitle: "保存设置？",
+    saveConfirmBody: "确认后当前设置将生效。",
+    saveConfirmLabel: "保存"
+  },
+  audienceDrawer: {
+    mbti: {
+      ISTJ: "检查者", ISFJ: "守护者", INFJ: "提倡者", INTJ: "建筑师",
+      ISTP: "鉴赏家", ISFP: "探险家", INFP: "调停者", INTP: "逻辑学家",
+      ESTP: "企业家", ESFP: "表演者", ENFP: "竞选者", ENTP: "辩论家",
+      ESTJ: "总经理", ESFJ: "执政官", ENFJ: "主人公", ENTJ: "指挥官"
+    },
+    demographics: {
+      gender: "性别",
+      ageRange: "年龄段",
+      cityTier: "城市层级",
+      lifeStage: "人生阶段",
+      role: "基础身份",
+      spendingPower: "消费能力"
+    },
+    editTitle: "编辑{{name}}人设",
+    viewTitle: "{{label}}",
+    editSubtitle: "调整这个观众的背景小传、性格、MBTI 和响应方式。",
+    viewSubtitle: "查看这个采样画像，确认是否需要生成具体人设。",
+    modifyAvatar: "修改头像",
+    avatar: {
+      uploading: "上传中",
+      upload: "上传图片",
+      useDefault: "用系统头像",
+      failed: "头像上传失败",
+      uploadAria: "上传头像图片"
+    },
+    namePlaceholder: "未命名观众",
+    profilePending: "画像待生成 · 采样 slot",
+    personaSection: "Agent 人设",
+    personaHint: "用于模拟这个观众的稳定身份和社区互动方式",
+    profileText: "背景小传",
+    profileHint: "这个人的生活经历、当前处境和长期习惯。",
+    personality: "性格特征",
+    personalityHint: "这个人的性格、价值观和决策偏好。",
+    mbtiType: "MBTI 类型",
+    mbtiHint: "选择 16 型人格之一，括号内是中文名。",
+    responseStyle: "响应风格",
+    responseStyleHint: "浏览判断方式、互动倾向和评论表达方式。",
+    profileOnly: "画像详情",
+    profileOnlyHint: "采样 slot，尚未生成具体人设",
+    profileOnlyBody: "这个画像只用于覆盖和去重。生成人设后才会出现背景小传、性格、MBTI 和响应风格。",
+    samplingSection: "采样信息",
+    samplingHint: "只读，用于追溯这个 Agent 的来源",
+    samplingLabel: "采样标签",
+    samplingLabelEmpty: "暂无采样标签",
+    deletePersona: "删除人设",
+    deleteProfile: "删除画像",
+    savePersona: "保存人设",
+    generatePersona: "生成人设",
+    nameAria: "昵称",
+    identityPreview: "观众身份预览"
+  },
+  assistant: {
+    stage: {
+      plan: "采样计划",
+      seat: "观众席"
+    },
+    empty: {
+      planTitle: "还没有调整建议",
+      seatTitle: "还没有打磨建议",
+      planBody: "描述你想补充、拆分或删减的人群。",
+      seatBody: "描述你想调整、重生或保留的观众。"
+    },
+    mentioned: "已引用 {{count}} 项",
+    mentionHint: "可用 @ 引用分组或观众",
+    mentionSearch: "查找：{{query}}",
+    mentionEmpty: "可引用对象",
+    mentionAria: "已引用对象",
+    noMatch: "没有匹配项",
+    applyAll: "采纳全部",
+    apply: "采纳",
+    send: "发送",
+    discussionOnly: "暂无需要改动的内容。",
+    operation: {
+      add_directive: "新增分组",
+      update_directive: "修改分组",
+      delete_directive: "删除分组",
+      update_identity: "修改观众",
+      regenerate_identity: "重生人设",
+      delete_profile: "删除观众",
+      favorite_identity: "收藏状态",
+      retry_identity: "重试人设",
+      add_profile: "新增观众"
+    },
+    status: {
+      running: "更新中",
+      success: "已采纳",
+      failed: "失败",
+      not_applicable: "暂不可用",
+      idle: "未采纳"
+    },
+    field: {
+      name: "人群名称",
+      description: "人群描述",
+      quantity: "人数",
+      diversityAxes: "组内差异",
+      rationale: "分配理由",
+      sortOrder: "排序",
+      displayName: "昵称",
+      avatarUrl: "头像",
+      personaJson: "人设"
+    },
+    diff: {
+      emptyValue: "未填写",
+      people: "人",
+      favoriteLabel: "收藏状态",
+      favorite: "收藏",
+      unfavorite: "取消收藏",
+      samplingLabel: "采样标签",
+      demographics: "人口特征",
+      demographicsEmpty: "待生成"
+    }
+  },
+  imageViewer: {
+    coverPreview: "封面预览",
+    imageN: "图片 {{index}}",
+    cover: "封面",
+    deleteImage: "删除图片 {{index}}",
+    viewImage: "查看图片",
+    closeViewer: "关闭大图",
+    closeHint: "关闭提示"
+  },
+  seatFilter: {
+    all: "全部",
+    active: "进行中",
+    opened: "已点开",
+    commented: "已评论",
+    favorited: "已收藏",
+    skipped: "已跳过",
+    doubt: "有质疑",
+    finished: "已完成",
+    failed: "失败"
+  },
+  audienceStatus: {
+    failed: "生成失败",
+    ready: "已就绪",
+    partial: "部分就绪",
+    generating: "生成中",
+    pending: "待生成"
+  },
+  audienceFact: {
+    profileEmpty: "背景小传待生成",
+    sampleEmpty: "采样信息待补充",
+    unlimited: "不限定",
+    consumption: "消费"
+  },
+  runtimeLog: {
+    commentPrefix: "评论："
+  },
+  runtimeEvent: {
+    open_post: "有观众点开了内容",
+    read_post: "有观众阅读了正文",
+    like_post: "有观众点赞了这篇内容",
+    favorite_post: "有观众收藏了这篇内容",
+    share_post: "有观众分享了这篇内容",
+    write_comment: "有观众发表了评论",
+    like_comment: "有观众点赞了一条评论",
+    exit_browsing: "有观众结束了浏览",
+    fallback: "有观众产生了行为"
+  },
+  apiError: {
+    responseReadFailed: "无法读取服务端响应，请确认 API 服务运行正常。",
+    emptyResponse: "服务端返回空响应，请稍后重试。",
+    httpError: "请求失败（HTTP {{status}}），请确认 API 服务运行正常。",
+    invalidJsonResponse: "服务端返回了非 JSON 响应，请确认 API 服务运行正常。",
+    networkError: "无法连接 API 服务，请确认后端已启动后重试。"
+  },
+  imageError: {
+    unsupportedType: "仅支持 jpg/png/webp 图片",
+    canvasUnsupported: "浏览器不支持图片压缩",
+    tooLarge: "图片压缩后仍超过 {{size}}，请换一张更小的原图",
+    unreadable: "图片无法读取",
+    compressFailed: "图片压缩失败"
+  },
+  language: {
+    title: "界面语言",
+    description: "选择 UI 显示语言，保存设置后生效并记住此设备。",
+    zh: "简体中文",
+    en: "English"
+  }
+} as const;

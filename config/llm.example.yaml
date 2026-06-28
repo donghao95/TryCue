@@ -1,0 +1,10 @@
+provider: openai-compatible
+runtimeMode: mock
+apiKey: ""
+baseUrl: ""
+models:
+  fast: ""
+  pro: ""
+capacity:
+  mode: auto
+  preset: standard

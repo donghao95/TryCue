@@ -1,0 +1,24 @@
+.venueShell {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  height: 100dvh;
+  overflow: hidden;
+  padding: 24px var(--page-gutter) 12px;
+  background: var(--paper-grid);
+  background-size: 28px 28px;
+}
+
+.venueShell .stageOrb {
+  display: none;
+}
+
+.venueDisclosure {
+  display: flex;
+  justify-content: center;
+  padding-top: 6px;
+}
+
+.venueDisclosure .simulationNote {
+  text-align: center;
+}
+

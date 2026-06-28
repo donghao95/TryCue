@@ -1,0 +1,62 @@
+# Dependencies
+node_modules/
+
+# Build outputs
+dist/
+build/
+*.tsbuildinfo
+
+# Test coverage
+coverage/
+
+# Logs
+*.log
+logs/
+
+# Local env (keep .env.example tracked)
+.env
+.env.*
+!.env.example
+
+# Local LLM config (keep llm.example.yaml tracked)
+config/llm.local.yaml
+config/*.local.yaml
+config/*.test.yaml
+
+# Local database & data
+data/
+packages/db/prisma/dev.db
+*.db
+*.sqlite
+
+# Uploads (keep demo images tracked)
+/uploads/
+apps/api/uploads/*
+!apps/api/uploads/demo-trycue-room.jpg
+!apps/api/uploads/demo-trycue-detail.jpg
+!apps/api/uploads/demo-trycue-list.jpg
+
+# Internal prompt evals
+apps/api/src/scripts/prompt-evals/
+
+# Internal docs that should not be public
+docs/测试api key.txt
+docs/ChatGPT Image 2026年5月29日 17_56_12.png
+
+# Claude / Codex / AI assistant internal artifacts
+.claude/
+.claude-tmp/
+.codex/
+.codex-artifacts/
+.codex-run/
+.codex-runlogs/
+.workbuddy/
+.playwright-mcp/
+code-review-fix-report.md
+code-review-report.html
+docs/code_review/
+
+# OS / editor
+.DS_Store
+Thumbs.db
+*.swp

@@ -1,0 +1,1025 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+enum RunStatus {
+  draft
+  planning_audience
+  generating_audience
+  audience_ready
+  running
+  pausing
+  paused
+  report_generating
+  completed
+}
+
+enum UserType {
+  human
+  agent
+  system
+}
+
+enum Platform {
+  xiaohongshu
+  douyin
+  wechat
+}
+
+enum InteractionSource {
+  agent_tool
+  human_ui
+  system_seed
+  replay
+}
+
+enum SocialTargetType {
+  post
+  comment
+}
+
+enum SocialReactionType {
+  like
+  favorite
+}
+
+enum RunParticipantStatus {
+  ready
+  queued
+  thinking
+  tool_running
+  waiting_next
+  finished
+  skipped
+  failed
+}
+
+enum AudienceIdentityStatus {
+  profile_only
+  identity_queued
+  identity_generating
+  identity_ready
+  identity_failed
+}
+
+enum AudienceGenerationJobStatus {
+  queued
+  planning
+  generating
+  completed
+  failed
+  canceled
+}
+
+enum AudienceGenerationJobScope {
+  sampling_plan
+  profile_expansion
+  identities
+  single_identity
+}
+
+enum AudienceSamplingPlanStatus {
+  draft
+  planning
+  ready_for_review
+  confirmed
+  expanding_profiles
+  generating_identities
+  ready
+  ready_with_failures
+  failed
+  canceled
+}
+
+enum AudienceSamplingDirectiveExpansionStatus {
+  pending
+  generating
+  ready
+  failed
+}
+
+enum AudienceGroupRole {
+  core_target
+  peripheral_target
+  contrast
+  exploratory
+  unknown
+}
+
+enum JourneyStatus {
+  active
+  finished
+  failed
+}
+
+enum JourneyRunnerStatus {
+  queued
+  idle
+  running
+}
+
+enum AgentTurnStatus {
+  created
+  context_recorded
+  model_calling
+  model_returned
+  tools_executing
+  completed
+  failed
+  recovered
+}
+
+enum AgentToolCallStatus {
+  pending
+  committed
+  ignored
+  failed
+}
+
+enum AgentTranscriptItemType {
+  initial_observation
+  assistant_message
+  assistant_tool_calls
+  tool_result
+  system_notice
+}
+
+enum JourneyExitOutcome {
+  skipped
+  browsed_and_left
+  risk_exit
+  max_steps
+}
+
+enum ToolCategory {
+  navigation
+  interaction
+}
+
+enum IdentityRetentionPolicy {
+  delete_with_origin_run
+  retain
+}
+
+enum AssetStorage {
+  local
+  external
+}
+
+model TestRun {
+  id                  String    @id @default(uuid())
+  status              RunStatus @default(draft)
+  mode                String    @default("single")
+  contentVersionCount Int       @default(1) @map("content_version_count")
+  audienceCount       Int       @map("audience_count")
+  audienceRevision    Int       @default(0) @map("audience_revision")
+  simulationSpeed     String    @default("fast_replay") @map("simulation_speed")
+  configJson          Json      @default("{}") @map("config_json")
+  errorMessage        String?   @map("error_message")
+  clockElapsedMs      Int       @default(0) @map("clock_elapsed_ms")
+  clockAnchorAt       DateTime? @map("clock_anchor_at")
+  clockScale          Int       @default(10) @map("clock_scale")
+  createdAt           DateTime  @default(now()) @map("created_at")
+  startedAt           DateTime? @map("started_at")
+  completedAt         DateTime? @map("completed_at")
+  terminalReason      String?   @map("terminal_reason")
+  updatedAt           DateTime  @updatedAt @map("updated_at")
+
+  contentVersions        ContentVersion[]
+  runParticipants        RunParticipant[]
+  audienceSamplingPlan   AudienceSamplingPlan?
+  audienceProfiles       AudienceProfile[]
+  audienceGenerationJobs AudienceGenerationJob[]
+  journeys               AgentJourney[]
+  agentTranscriptItems   AgentTranscriptItem[]
+  agentTurns             AgentTurn[]
+  agentToolCalls         AgentToolCall[]
+  llmCallTraces          LlmCallTrace[]
+  llmUsageSummary        RunLlmUsageSummary?
+  liveEvents             LiveEvent[]
+  actionLogs             ActionLog[]
+  runLogs                RunLog[]
+  reports                Report[]
+  originAgents           Agent[]                 @relation("AgentOriginRun")
+
+  @@index([status], map: "idx_test_runs_status")
+  @@index([createdAt], map: "idx_test_runs_created_at")
+  @@map("test_runs")
+}
+
+model ContentVersion {
+  id            String   @id @default(uuid())
+  runId         String   @map("run_id")
+  versionName   String   @default("version_a") @map("version_name")
+  title         String
+  coverImageUrl String?  @map("cover_image_url")
+  imageUrlsJson Json     @default("[]") @map("image_urls_json")
+  bodyText      String   @map("body_text")
+  scale         String
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  run                     TestRun                  @relation(fields: [runId], references: [id], onDelete: Cascade)
+  images                  ContentVersionImage[]
+  simulatedPostState      SimulatedPostState?
+  socialInteractionEvents SocialInteractionEvent[]
+  socialReactions         SocialReaction[]
+  loadedCommentPages      LoadedCommentPage[]
+  simulatedComments       SimulatedComment[]
+  insights                Insight[]
+  reports                 Report[]
+  journeys                AgentJourney[]
+  agentTurns              AgentTurn[]
+  agentToolCalls          AgentToolCall[]
+  actionLogs              ActionLog[]
+
+  @@unique([runId], map: "ux_content_versions_run_id")
+  @@map("content_versions")
+}
+
+model Asset {
+  id           String       @id @default(uuid())
+  storage      AssetStorage @default(local)
+  url          String       @unique
+  storageKey   String?      @unique @map("storage_key")
+  originalName String?      @map("original_name")
+  mimeType     String?      @map("mime_type")
+  width        Int?
+  height       Int?
+  sizeBytes    Int?         @map("size_bytes")
+  createdAt    DateTime     @default(now()) @map("created_at")
+
+  contentVersionImages ContentVersionImage[]
+
+  @@index([storage], map: "idx_assets_storage")
+  @@map("assets")
+}
+
+model ContentVersionImage {
+  id               String   @id @default(uuid())
+  contentVersionId String   @map("content_version_id")
+  assetId          String?  @map("asset_id")
+  url              String
+  sortOrder        Int      @map("sort_order")
+  createdAt        DateTime @default(now()) @map("created_at")
+
+  contentVersion ContentVersion @relation(fields: [contentVersionId], references: [id], onDelete: Cascade)
+  asset          Asset?         @relation(fields: [assetId], references: [id], onDelete: SetNull)
+
+  @@unique([contentVersionId, sortOrder], map: "ux_content_version_images_sort")
+  @@unique([contentVersionId, url], map: "ux_content_version_images_url")
+  @@index([assetId], map: "idx_content_version_images_asset_id")
+  @@map("content_version_images")
+}
+
+model User {
+  id             String     @id @default(uuid())
+  userType       UserType   @default(human) @map("user_type")
+  nickname       String
+  avatarUrl      String?    @map("avatar_url")
+  createdAt      DateTime   @default(now()) @map("created_at")
+  updatedAt      DateTime   @updatedAt @map("updated_at")
+
+  generatedByProfile      AudienceProfile?         @relation("GeneratedProfileUser")
+  agent                   Agent?
+  platformAccounts        PlatformAccount[]
+  runParticipants         RunParticipant[]
+  journeys                AgentJourney[]                @relation("JourneyActorUser")
+  agentTurns              AgentTurn[]              @relation("AgentTurnActorUser")
+  agentToolCalls          AgentToolCall[]          @relation("ToolCallActorUser")
+  socialInteractionEvents SocialInteractionEvent[] @relation("SocialEventActorUser")
+  socialReactions         SocialReaction[]         @relation("SocialReactionActorUser")
+  loadedCommentPages      LoadedCommentPage[]      @relation("LoadedCommentPageActorUser")
+  simulatedComments       SimulatedComment[]       @relation("SimulatedCommentActorUser")
+  actionLogs              ActionLog[]              @relation("ActionLogActorUser")
+  runLogs                 RunLog[]                 @relation("RunLogActorUser")
+
+  @@index([userType], map: "idx_users_user_type")
+  @@map("users")
+}
+
+model Agent {
+  id              String                  @id @default(uuid())
+  userId          String                  @map("user_id")
+  originRunId     String?                 @map("origin_run_id")
+  sourceProfileId String?                 @map("source_profile_id")
+  retentionPolicy IdentityRetentionPolicy @default(retain) @map("retention_policy")
+  favoritedAt     DateTime?               @map("favorited_at")
+  personaJson     Json                    @default("{}") @map("persona_json")
+  memorySummary   String?                 @map("memory_summary")
+  createdAt       DateTime                @default(now()) @map("created_at")
+  updatedAt       DateTime                @updatedAt @map("updated_at")
+
+  user                    User                     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  originRun               TestRun?                 @relation("AgentOriginRun", fields: [originRunId], references: [id], onDelete: SetNull)
+  sourceProfile           AudienceProfile?         @relation("AgentSourceProfile", fields: [sourceProfileId], references: [id], onDelete: SetNull)
+  generatedByProfile      AudienceProfile?         @relation("GeneratedProfileAgent")
+  runParticipants         RunParticipant[]
+  socialInteractionEvents SocialInteractionEvent[]
+  socialReactions         SocialReaction[]
+  simulatedComments       SimulatedComment[]
+
+  @@unique([userId], map: "ux_agents_user_id")
+  @@index([originRunId, retentionPolicy], map: "idx_agents_origin_retention")
+  @@index([sourceProfileId], map: "idx_agents_source_profile_id")
+  @@index([favoritedAt], map: "idx_agents_favorited_at")
+  @@map("agents")
+}
+
+model PlatformAccount {
+  id             String   @id @default(uuid())
+  userId         String   @map("user_id")
+  platform       Platform
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  user                    User                     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  generatedByProfile      AudienceProfile?         @relation("GeneratedProfilePlatformAccount")
+  runParticipants         RunParticipant[]
+  journeys                AgentJourney[]
+  agentTurns              AgentTurn[]
+  agentToolCalls          AgentToolCall[]
+  socialInteractionEvents SocialInteractionEvent[]
+  socialReactions         SocialReaction[]
+  loadedCommentPages      LoadedCommentPage[]
+  simulatedComments       SimulatedComment[]
+  actionLogs              ActionLog[]
+  runLogs                 RunLog[]
+
+  @@unique([userId, platform], map: "ux_platform_accounts_user_platform")
+  @@map("platform_accounts")
+}
+
+model RunParticipant {
+  id                String                @id @default(uuid())
+  runId             String                @map("run_id")
+  sourceProfileId   String?               @map("source_profile_id")
+  samplingDirectiveId String?              @map("sampling_directive_id")
+  sortOrder         Int                   @default(0) @map("sort_order")
+  userId            String                @map("user_id")
+  agentId           String                @map("agent_id")
+  platformAccountId String                @map("platform_account_id")
+  source            String                @default("generated")
+  displayNameSnapshot String              @map("display_name_snapshot")
+  avatarUrlSnapshot String?               @map("avatar_url_snapshot")
+  profileSnapshotJson Json                @default("{}") @map("profile_snapshot_json")
+  agentSnapshotJson Json                  @default("{}") @map("agent_snapshot_json")
+  platformAccountSnapshotJson Json        @default("{}") @map("platform_account_snapshot_json")
+  runtimeStatus     RunParticipantStatus  @default(ready) @map("runtime_status")
+  createdAt         DateTime              @default(now()) @map("created_at")
+  updatedAt         DateTime              @updatedAt @map("updated_at")
+
+  run                  TestRun                  @relation(fields: [runId], references: [id], onDelete: Cascade)
+  sourceProfile        AudienceProfile?         @relation(fields: [sourceProfileId], references: [id], onDelete: SetNull)
+  samplingDirective    AudienceSamplingDirective? @relation(fields: [samplingDirectiveId], references: [id], onDelete: SetNull)
+  user                 User                     @relation(fields: [userId], references: [id], onDelete: Restrict)
+  agent                Agent                    @relation(fields: [agentId], references: [id], onDelete: Restrict)
+  platformAccount      PlatformAccount          @relation(fields: [platformAccountId], references: [id], onDelete: Restrict)
+  journeys             AgentJourney[]
+  agentTurns           AgentTurn[]
+  agentToolCalls       AgentToolCall[]
+  socialEvents         SocialInteractionEvent[]
+  socialReactions      SocialReaction[]
+  loadedCommentPages   LoadedCommentPage[]
+  simulatedComments    SimulatedComment[]
+  actionLogs           ActionLog[]
+  runLogs              RunLog[]
+
+  @@unique([runId, platformAccountId], map: "ux_run_participants_run_platform_account")
+  @@index([runId, samplingDirectiveId, sortOrder], map: "idx_run_participants_run_directive_sort")
+  @@index([sourceProfileId], map: "idx_run_participants_source_profile_id")
+  @@index([userId], map: "idx_run_participants_user_id")
+  @@index([agentId], map: "idx_run_participants_agent_id")
+  @@index([platformAccountId], map: "idx_run_participants_platform_account_id")
+  @@index([runId, runtimeStatus], map: "idx_run_participants_run_runtime_status")
+  @@index([runId], map: "idx_run_participants_run_id")
+  @@map("run_participants")
+}
+
+model AudienceSamplingPlan {
+  id                String                     @id @default(uuid())
+  runId             String                     @unique(map: "ux_audience_sampling_plans_run_id") @map("run_id")
+  generationJobId   String?                    @map("generation_job_id")
+  totalCount        Int                        @map("total_count")
+  status            AudienceSamplingPlanStatus @default(draft)
+  planMarkdown      String                     @default("") @map("plan_markdown")
+  dimensionsJson    Json                       @default("[]") @map("dimensions_json")
+  errorMessage      String?                    @map("error_message")
+  confirmedAt       DateTime?                  @map("confirmed_at")
+  createdAt         DateTime                   @default(now()) @map("created_at")
+  updatedAt         DateTime                   @updatedAt @map("updated_at")
+
+  run           TestRun                  @relation(fields: [runId], references: [id], onDelete: Cascade)
+  generationJob AudienceGenerationJob?   @relation("SamplingPlanCreatorJob", fields: [generationJobId], references: [id], onDelete: SetNull)
+  directives    AudienceSamplingDirective[]
+  profiles      AudienceProfile[]
+  jobs          AudienceGenerationJob[]  @relation("TargetSamplingPlanJob")
+
+  @@index([generationJobId], map: "idx_audience_sampling_plans_generation_job_id")
+  @@index([runId, status], map: "idx_audience_sampling_plans_run_status")
+  @@map("audience_sampling_plans")
+}
+
+model AudienceSamplingDirective {
+  id                  String                                     @id @default(uuid())
+  planId              String                                     @map("plan_id")
+  sortOrder           Int                                        @map("sort_order")
+  name                String
+  description         String
+  quantity            Int
+  diversityAxesJson   Json                                       @default("[]") @map("diversity_axes_json")
+  rationale           String
+  groupRole           AudienceGroupRole                          @default(unknown) @map("group_role")
+  samplingReason      String                                     @default("") @map("sampling_reason")
+  expansionStatus     AudienceSamplingDirectiveExpansionStatus   @default(pending) @map("expansion_status")
+  expansionError      String?                                    @map("expansion_error")
+  createdAt           DateTime                                   @default(now()) @map("created_at")
+  updatedAt           DateTime                                   @updatedAt @map("updated_at")
+
+  plan         AudienceSamplingPlan @relation(fields: [planId], references: [id], onDelete: Cascade)
+  profiles     AudienceProfile[]
+  jobs         AudienceGenerationJob[] @relation("TargetSamplingDirectiveJob")
+  participants RunParticipant[]
+
+  @@unique([planId, sortOrder], map: "ux_audience_sampling_directives_plan_sort")
+  @@index([planId], map: "idx_audience_sampling_directives_plan_id")
+  @@index([planId, expansionStatus], map: "idx_audience_sampling_directives_plan_expansion_status")
+  @@map("audience_sampling_directives")
+}
+
+model AudienceProfile {
+  id                         String                 @id @default(uuid())
+  runId                      String                 @map("run_id")
+  samplingPlanId             String?                @map("sampling_plan_id")
+  samplingDirectiveId        String?                @map("sampling_directive_id")
+  sampleIndex                Int                    @default(0) @map("sample_index")
+  generationJobId            String?                @map("generation_job_id")
+  sortOrder                  Int                    @default(0) @map("sort_order")
+  samplingLabel              String                 @map("sampling_label")
+  demographicsJson           Json                   @map("demographics_json")
+  identityStatus             AudienceIdentityStatus @default(profile_only) @map("identity_status")
+  identityError              String?                @map("identity_error")
+  identityGeneratedAt        DateTime?              @map("identity_generated_at")
+  generatedUserId            String?                @unique(map: "ux_audience_profiles_generated_user_id") @map("generated_user_id")
+  generatedAgentId           String?                @unique(map: "ux_audience_profiles_generated_agent_id") @map("generated_agent_id")
+  generatedPlatformAccountId String?                @unique(map: "ux_audience_profiles_generated_platform_account_id") @map("generated_platform_account_id")
+  createdAt                  DateTime               @default(now()) @map("created_at")
+  updatedAt                  DateTime               @updatedAt @map("updated_at")
+
+  run                      TestRun                    @relation(fields: [runId], references: [id], onDelete: Cascade)
+  samplingPlan             AudienceSamplingPlan?      @relation(fields: [samplingPlanId], references: [id], onDelete: SetNull)
+  samplingDirective        AudienceSamplingDirective? @relation(fields: [samplingDirectiveId], references: [id], onDelete: SetNull)
+  generationJob            AudienceGenerationJob?     @relation("ProfileGenerationJob", fields: [generationJobId], references: [id], onDelete: SetNull)
+  generatedUser            User?                      @relation("GeneratedProfileUser", fields: [generatedUserId], references: [id], onDelete: SetNull)
+  generatedAgent           Agent?                     @relation("GeneratedProfileAgent", fields: [generatedAgentId], references: [id], onDelete: SetNull)
+  generatedPlatformAccount PlatformAccount?           @relation("GeneratedProfilePlatformAccount", fields: [generatedPlatformAccountId], references: [id], onDelete: SetNull)
+  sourceAgents             Agent[]                    @relation("AgentSourceProfile")
+  targetGenerationJobs     AudienceGenerationJob[]    @relation("TargetProfileGenerationJob")
+  participants             RunParticipant[]
+
+  @@unique([samplingDirectiveId, sampleIndex], map: "ux_audience_profiles_directive_sample")
+  @@index([runId, samplingDirectiveId, sortOrder], map: "idx_audience_profiles_run_directive_sort")
+  @@index([samplingPlanId], map: "idx_audience_profiles_sampling_plan_id")
+  @@index([generationJobId], map: "idx_audience_profiles_generation_job_id")
+  @@index([runId, identityStatus], map: "idx_audience_profiles_run_identity_status")
+  @@map("audience_profiles")
+}
+
+model AudienceGenerationJob {
+  id                  String                      @id @default(uuid())
+  runId               String                      @map("run_id")
+  scope               AudienceGenerationJobScope  @default(sampling_plan)
+  status              AudienceGenerationJobStatus @default(queued)
+  active              Boolean                     @default(true)
+  profileId           String?                     @map("profile_id")
+  samplingPlanId      String?                     @map("sampling_plan_id")
+  samplingDirectiveId String?                     @map("sampling_directive_id")
+  targetCount         Int                         @map("target_count")
+  batchSize           Int                         @default(10) @map("batch_size")
+  errorMessage        String?                     @map("error_message")
+  attemptCount        Int                         @default(0) @map("attempt_count")
+  lockedBy            String?                     @map("locked_by")
+  lockedUntil         DateTime?                   @map("locked_until")
+  heartbeatAt         DateTime?                   @map("heartbeat_at")
+  startedAt           DateTime?                   @map("started_at")
+  completedAt         DateTime?                   @map("completed_at")
+  canceledAt          DateTime?                   @map("canceled_at")
+  createdAt           DateTime                    @default(now()) @map("created_at")
+  updatedAt           DateTime                    @updatedAt @map("updated_at")
+
+  run                  TestRun                    @relation(fields: [runId], references: [id], onDelete: Cascade)
+  targetProfile        AudienceProfile?           @relation("TargetProfileGenerationJob", fields: [profileId], references: [id], onDelete: SetNull)
+  samplingPlan         AudienceSamplingPlan?      @relation("TargetSamplingPlanJob", fields: [samplingPlanId], references: [id], onDelete: SetNull)
+  samplingDirective    AudienceSamplingDirective? @relation("TargetSamplingDirectiveJob", fields: [samplingDirectiveId], references: [id], onDelete: SetNull)
+  createdSamplingPlans AudienceSamplingPlan[]     @relation("SamplingPlanCreatorJob")
+  createdProfiles      AudienceProfile[]          @relation("ProfileGenerationJob")
+
+  @@index([runId, active, status], map: "idx_audience_generation_jobs_run_active_status")
+  @@index([runId, status], map: "idx_audience_generation_jobs_run_status")
+  @@index([runId, scope], map: "idx_audience_generation_jobs_run_scope")
+  @@index([samplingPlanId], map: "idx_audience_generation_jobs_sampling_plan_id")
+  @@index([samplingDirectiveId], map: "idx_audience_generation_jobs_sampling_directive_id")
+  @@index([profileId], map: "idx_audience_generation_jobs_profile_id")
+  @@index([status, lockedUntil], map: "idx_audience_generation_jobs_recovery")
+  @@map("audience_generation_jobs")
+}
+
+model AgentJourney {
+  id                String              @id @default(uuid())
+  runId             String              @map("run_id")
+  participantId     String              @map("run_participant_id")
+  actorUserId       String              @map("actor_user_id")
+  platformAccountId String              @map("platform_account_id")
+  contentVersionId  String              @map("content_version_id")
+  promptVersion     String?             @map("prompt_version")
+  status            JourneyStatus       @default(active)
+  runnerStatus      JourneyRunnerStatus @default(queued) @map("runner_status")
+  queueSeq          BigInt              @default(0) @map("queue_seq")
+  lastTranscriptSeq Int                 @default(0) @map("last_transcript_seq")
+  currentStepIndex  Int                 @default(0) @map("current_step_index")
+  thoughtSummary    String?             @map("thought_summary")
+  finalSummary      String?             @map("final_summary")
+  exitOutcome       JourneyExitOutcome? @map("exit_outcome")
+  exitReason        String?             @map("exit_reason")
+  errorMessage      String?             @map("error_message")
+  lockedBy          String?             @map("locked_by")
+  lockedAt          DateTime?           @map("locked_at")
+  heartbeatAt       DateTime?           @map("heartbeat_at")
+  startedAt         DateTime?           @map("started_at")
+  createdAt         DateTime            @default(now()) @map("created_at")
+  updatedAt         DateTime            @updatedAt @map("updated_at")
+  completedAt       DateTime?           @map("completed_at")
+
+  run             TestRun                  @relation(fields: [runId], references: [id], onDelete: Cascade)
+  participant     RunParticipant           @relation(fields: [participantId], references: [id], onDelete: Cascade)
+  actorUser       User                     @relation("JourneyActorUser", fields: [actorUserId], references: [id], onDelete: Restrict)
+  platformAccount PlatformAccount          @relation(fields: [platformAccountId], references: [id], onDelete: Restrict)
+  contentVersion  ContentVersion           @relation(fields: [contentVersionId], references: [id], onDelete: Cascade)
+  turns           AgentTurn[]
+  transcriptItems AgentTranscriptItem[]
+  agentToolCalls  AgentToolCall[]
+  socialEvents    SocialInteractionEvent[]
+  loadedPages     LoadedCommentPage[]
+  comments        SimulatedComment[]
+  actionLogs      ActionLog[]
+
+  @@unique([runId, participantId, contentVersionId], map: "ux_agent_journeys_run_participant_content")
+  @@index([runId, status], map: "idx_agent_journeys_run_status")
+  @@index([runId, status, runnerStatus, queueSeq, createdAt], map: "idx_agent_journeys_runner_claim")
+  @@index([actorUserId], map: "idx_agent_journeys_actor_user_id")
+  @@index([platformAccountId], map: "idx_agent_journeys_platform_account_id")
+  @@map("agent_journeys")
+}
+
+model AgentTranscriptItem {
+  id              String                  @id @default(uuid())
+  runId           String                  @map("run_id")
+  journeyId       String                  @map("journey_id")
+  agentTurnId     String?                 @map("agent_turn_id")
+  toolCallId      String?                 @map("agent_tool_call_id")
+  seq             Int
+  itemType        AgentTranscriptItemType @map("item_type")
+  content         String?
+  reasoningContent String?                @map("reasoning_content")
+  observationJson Json?                   @map("observation_json")
+  toolCallsJson   Json?                   @map("tool_calls_json")
+  toolResultJson  Json?                   @map("tool_result_json")
+  metadataJson    Json                    @default("{}") @map("metadata_json")
+  createdAt       DateTime                @default(now()) @map("created_at")
+
+  run       TestRun           @relation(fields: [runId], references: [id], onDelete: Cascade)
+  journey   AgentJourney      @relation(fields: [journeyId], references: [id], onDelete: Cascade)
+  agentTurn AgentTurn?        @relation(fields: [agentTurnId], references: [id], onDelete: SetNull)
+  toolCall  AgentToolCall?    @relation(fields: [toolCallId], references: [id], onDelete: SetNull)
+
+  @@unique([journeyId, seq], map: "ux_agent_transcript_items_journey_seq")
+  @@unique([toolCallId, itemType], map: "ux_agent_transcript_items_tool_call_item_type")
+  @@index([runId, journeyId, seq], map: "idx_agent_transcript_items_run_journey_seq")
+  @@index([agentTurnId], map: "idx_agent_transcript_items_turn_id")
+  @@index([toolCallId], map: "idx_agent_transcript_items_tool_call_id")
+  @@map("agent_transcript_items")
+}
+
+model AgentTurn {
+  id                 String           @id @default(uuid())
+  runId              String           @map("run_id")
+  participantId      String           @map("run_participant_id")
+  actorUserId        String           @map("actor_user_id")
+  platformAccountId  String           @map("platform_account_id")
+  journeyId          String           @map("journey_id")
+  contentVersionId   String           @map("content_version_id")
+  stepIndex          Int              @map("step_index")
+  queueSeq           BigInt           @map("queue_seq")
+  status               AgentTurnStatus  @default(created)
+  thoughtText          String?          @map("thought_text")
+  reasoningContent     String?          @map("reasoning_content")
+  rawAgentOutputJson   Json?            @map("raw_agent_output_json")
+  requestJson          Json?            @map("request_json")
+  rawResponseJson      Json?            @map("raw_response_json")
+  parsedToolCallsJson  Json?            @map("parsed_tool_calls_json")
+  model                String?
+  promptVersion        String?          @map("prompt_version")
+  retryCount           Int              @default(0) @map("retry_count")
+  errorMessage       String?          @map("error_message")
+  lockedBy           String?          @map("locked_by")
+  lockedAt           DateTime?        @map("locked_at")
+  startedAt          DateTime?        @map("started_at")
+  completedAt        DateTime?        @map("completed_at")
+  createdAt          DateTime         @default(now()) @map("created_at")
+  updatedAt          DateTime         @updatedAt @map("updated_at")
+
+  run             TestRun                 @relation(fields: [runId], references: [id], onDelete: Cascade)
+  participant     RunParticipant          @relation(fields: [participantId], references: [id], onDelete: Cascade)
+  actorUser       User                    @relation("AgentTurnActorUser", fields: [actorUserId], references: [id], onDelete: Restrict)
+  platformAccount PlatformAccount         @relation(fields: [platformAccountId], references: [id], onDelete: Restrict)
+  journey         AgentJourney            @relation(fields: [journeyId], references: [id], onDelete: Cascade)
+  contentVersion  ContentVersion          @relation(fields: [contentVersionId], references: [id], onDelete: Cascade)
+  context         AgentTurnContext?
+  toolCalls       AgentToolCall[]
+  transcriptItems AgentTranscriptItem[]
+  socialEvents    SocialInteractionEvent[]
+  loadedPages     LoadedCommentPage[]
+  comments        SimulatedComment[]
+  actionLogs      ActionLog[]
+
+  @@unique([journeyId, stepIndex], map: "ux_agent_turn_step")
+  @@index([runId, status, queueSeq, createdAt], map: "idx_agent_turns_pending")
+  @@index([runId, status], map: "idx_agent_turns_run_status")
+  @@index([participantId], map: "idx_agent_turns_participant_id")
+  @@map("agent_turns")
+}
+
+model AgentTurnContext {
+  id                  String   @id @default(uuid())
+  agentTurnId         String   @map("agent_turn_id")
+  screenBeforeJson    Json     @map("screen_before_json")
+  postStateBeforeJson Json     @map("post_state_before_json")
+  commentsPageJson    Json     @default("{}") @map("comments_page_json")
+  thoughtSummary      String?  @map("thought_summary")
+  availableToolsJson  Json     @default("[]") @map("available_tools_json")
+  inputContextJson    Json     @map("input_context_json")
+  model               String
+  promptVersion       String   @map("prompt_version")
+  createdAt           DateTime @default(now()) @map("created_at")
+
+  agentTurn AgentTurn @relation(fields: [agentTurnId], references: [id], onDelete: Cascade)
+
+  @@unique([agentTurnId], map: "ux_agent_turn_contexts_turn_id")
+  @@index([agentTurnId], map: "idx_agent_turn_contexts_turn_id")
+  @@map("agent_turn_contexts")
+}
+
+model AgentToolCall {
+  id                String              @id @default(uuid())
+  agentTurnId       String              @map("agent_turn_id")
+  runId             String              @map("run_id")
+  journeyId         String              @map("journey_id")
+  participantId     String              @map("run_participant_id")
+  actorUserId       String              @map("actor_user_id")
+  platformAccountId String              @map("platform_account_id")
+  source            InteractionSource   @default(agent_tool)
+  contentVersionId  String              @map("content_version_id")
+  callIndex         Int                 @map("call_index")
+  sdkCallId         String?             @map("sdk_call_id")
+  idempotencyKey    String              @unique @map("idempotency_key")
+  rawToolCallJson   Json?               @map("raw_tool_call_json")
+  toolName          String              @map("tool_name")
+  toolCategory      ToolCategory        @map("tool_category")
+  input             Json
+  output            Json                @default("{}")
+  status            AgentToolCallStatus @default(pending)
+  simulatedTime     Int                 @map("simulated_time")
+  errorMessage      String?             @map("error_message")
+  createdAt         DateTime            @default(now()) @map("created_at")
+  updatedAt         DateTime            @updatedAt @map("updated_at")
+
+  agentTurn       AgentTurn               @relation(fields: [agentTurnId], references: [id], onDelete: Cascade)
+  run             TestRun                 @relation(fields: [runId], references: [id], onDelete: Cascade)
+  journey         AgentJourney            @relation(fields: [journeyId], references: [id], onDelete: Cascade)
+  participant     RunParticipant          @relation(fields: [participantId], references: [id], onDelete: Cascade)
+  actorUser       User                    @relation("ToolCallActorUser", fields: [actorUserId], references: [id], onDelete: Restrict)
+  platformAccount PlatformAccount         @relation(fields: [platformAccountId], references: [id], onDelete: Restrict)
+  contentVersion  ContentVersion          @relation(fields: [contentVersionId], references: [id], onDelete: Cascade)
+  socialEvents    SocialInteractionEvent[]
+  loadedPages     LoadedCommentPage[]
+  comments        SimulatedComment[]
+  actionLogs      ActionLog[]
+  transcriptItems AgentTranscriptItem[]
+
+  @@unique([agentTurnId, callIndex], map: "ux_agent_tool_calls_turn_index")
+  @@index([agentTurnId, sdkCallId], map: "idx_agent_tool_calls_turn_sdk_call_id")
+  @@index([runId, journeyId], map: "idx_agent_tool_calls_run_journey")
+  @@index([participantId], map: "idx_agent_tool_calls_participant_id")
+  @@map("agent_tool_calls")
+}
+
+model LiveEvent {
+  sequence  BigInt   @id @default(autoincrement())
+  runId     String   @map("run_id")
+  eventType String   @map("event_type")
+  payload   Json
+  createdAt DateTime @default(now()) @map("created_at")
+
+  run TestRun @relation(fields: [runId], references: [id], onDelete: Cascade)
+
+  @@index([runId, sequence], map: "idx_live_events_run_sequence")
+  @@index([createdAt], map: "idx_live_events_created_at")
+  @@map("live_events")
+}
+
+model SimulatedPostState {
+  id               String   @id @default(uuid())
+  contentVersionId String   @map("content_version_id")
+  exposureCount    Int      @default(0) @map("exposure_count")
+  openCount        Int      @default(0) @map("open_count")
+  likeCount        Int      @default(0) @map("like_count")
+  favoriteCount    Int      @default(0) @map("favorite_count")
+  commentCount     Int      @default(0) @map("comment_count")
+  shareCount       Int      @default(0) @map("share_count")
+  exitCount        Int      @default(0) @map("exit_count")
+  currentPhase     String   @default("running") @map("current_phase")
+  createdAt        DateTime @default(now()) @map("created_at")
+  updatedAt        DateTime @updatedAt @map("updated_at")
+
+  contentVersion ContentVersion @relation(fields: [contentVersionId], references: [id], onDelete: Cascade)
+
+  @@unique([contentVersionId], map: "ux_post_state_content")
+  @@map("simulated_post_states")
+}
+
+model SocialInteractionEvent {
+  id                String            @id @default(uuid())
+  contentVersionId  String            @map("content_version_id")
+  actorUserId       String            @map("actor_user_id")
+  platformAccountId String            @map("platform_account_id")
+  participantId     String?           @map("run_participant_id")
+  agentId           String?           @map("agent_id")
+  source            InteractionSource
+  journeyId         String?           @map("journey_id")
+  journeyActionId   String?           @map("journey_action_id")
+  toolCallId        String?           @map("tool_call_id")
+  interactionType   String            @map("interaction_type")
+  targetType        SocialTargetType? @map("target_type")
+  targetId          String?           @map("target_id")
+  cursor            String?
+  simulatedTime     Int               @map("simulated_time")
+  createdAt         DateTime          @default(now()) @map("created_at")
+
+  contentVersion  ContentVersion   @relation(fields: [contentVersionId], references: [id], onDelete: Cascade)
+  actorUser       User             @relation("SocialEventActorUser", fields: [actorUserId], references: [id], onDelete: Restrict)
+  platformAccount PlatformAccount  @relation(fields: [platformAccountId], references: [id], onDelete: Restrict)
+  participant     RunParticipant?  @relation(fields: [participantId], references: [id], onDelete: SetNull)
+  agent           Agent?           @relation(fields: [agentId], references: [id], onDelete: SetNull)
+  journey         AgentJourney?    @relation(fields: [journeyId], references: [id], onDelete: SetNull)
+  journeyAction   AgentTurn?      @relation(fields: [journeyActionId], references: [id], onDelete: SetNull)
+  toolCall        AgentToolCall?  @relation(fields: [toolCallId], references: [id], onDelete: SetNull)
+
+  @@unique([journeyActionId, toolCallId, interactionType], map: "ux_social_events_action_tool_type")
+  @@index([contentVersionId, interactionType], map: "idx_social_events_content_type")
+  @@index([contentVersionId, source, simulatedTime], map: "idx_social_events_content_source_time")
+  @@index([actorUserId], map: "idx_social_events_actor_user_id")
+  @@index([platformAccountId], map: "idx_social_events_platform_account_id")
+  @@map("social_interaction_events")
+}
+
+model SocialReaction {
+  id                String             @id @default(uuid())
+  contentVersionId  String             @map("content_version_id")
+  actorUserId       String             @map("actor_user_id")
+  platformAccountId String             @map("platform_account_id")
+  participantId     String?            @map("run_participant_id")
+  agentId           String?            @map("agent_id")
+  source            InteractionSource
+  targetType        SocialTargetType   @map("target_type")
+  targetId          String             @map("target_id")
+  reactionType      SocialReactionType @map("reaction_type")
+  active            Boolean            @default(true)
+  simulatedTime     Int                @map("simulated_time")
+  createdAt         DateTime           @default(now()) @map("created_at")
+  updatedAt         DateTime           @updatedAt @map("updated_at")
+
+  contentVersion  ContentVersion  @relation(fields: [contentVersionId], references: [id], onDelete: Cascade)
+  actorUser       User            @relation("SocialReactionActorUser", fields: [actorUserId], references: [id], onDelete: Restrict)
+  platformAccount PlatformAccount @relation(fields: [platformAccountId], references: [id], onDelete: Restrict)
+  participant     RunParticipant? @relation(fields: [participantId], references: [id], onDelete: SetNull)
+  agent           Agent?          @relation(fields: [agentId], references: [id], onDelete: SetNull)
+
+  @@unique([contentVersionId, actorUserId, platformAccountId, targetType, targetId, reactionType], map: "ux_social_reactions_content_actor_target")
+  @@index([contentVersionId, targetType, targetId, active], map: "idx_social_reactions_content_target_active")
+  @@index([contentVersionId, source, reactionType], map: "idx_social_reactions_content_source_type")
+  @@map("social_reactions")
+}
+
+model LoadedCommentPage {
+  id                String            @id @default(uuid())
+  contentVersionId  String            @map("content_version_id")
+  actorUserId       String            @map("actor_user_id")
+  platformAccountId String            @map("platform_account_id")
+  participantId     String?           @map("run_participant_id")
+  source            InteractionSource
+  journeyId         String?           @map("journey_id")
+  journeyActionId   String?           @map("journey_action_id")
+  toolCallId        String?           @map("tool_call_id")
+  cursor            String            @default("")
+  nextCursor        String?           @map("next_cursor")
+  sort              String            @default("latest")
+  commentIdsJson    Json              @default("[]") @map("comment_ids_json")
+  hasMore           Boolean           @default(false) @map("has_more")
+  simulatedTime     Int               @map("simulated_time")
+  createdAt         DateTime          @default(now()) @map("created_at")
+
+  contentVersion  ContentVersion   @relation(fields: [contentVersionId], references: [id], onDelete: Cascade)
+  actorUser       User             @relation("LoadedCommentPageActorUser", fields: [actorUserId], references: [id], onDelete: Restrict)
+  platformAccount PlatformAccount  @relation(fields: [platformAccountId], references: [id], onDelete: Restrict)
+  participant     RunParticipant?  @relation(fields: [participantId], references: [id], onDelete: SetNull)
+  journey         AgentJourney?    @relation(fields: [journeyId], references: [id], onDelete: SetNull)
+  journeyAction   AgentTurn?      @relation(fields: [journeyActionId], references: [id], onDelete: SetNull)
+  toolCall        AgentToolCall?  @relation(fields: [toolCallId], references: [id], onDelete: SetNull)
+
+  @@unique([contentVersionId, actorUserId, platformAccountId, cursor, sort], map: "ux_loaded_comment_pages_content_actor_cursor")
+  @@map("loaded_comment_pages")
+}
+
+model SimulatedComment {
+  id                      String            @id @default(uuid())
+  contentVersionId        String            @map("content_version_id")
+  actorUserId             String            @map("actor_user_id")
+  platformAccountId       String            @map("platform_account_id")
+  participantId           String?           @map("run_participant_id")
+  agentId                 String?           @map("agent_id")
+  source                  InteractionSource
+  journeyId               String?           @map("journey_id")
+  journeyActionId         String?           @map("journey_action_id")
+  toolCallId              String?           @map("tool_call_id")
+  parentCommentId         String?           @map("parent_comment_id")
+  rootCommentId           String?           @map("root_comment_id")
+  commentText             String            @map("comment_text")
+  mentionedUserIdsJson    Json              @default("[]") @map("mentioned_user_ids_json")
+  mentionedCommentIdsJson Json              @default("[]") @map("mentioned_comment_ids_json")
+  likeCount               Int               @default(0) @map("like_count")
+  replyCount              Int               @default(0) @map("reply_count")
+  simulatedTime           Int               @map("simulated_time")
+  createdAt               DateTime          @default(now()) @map("created_at")
+
+  contentVersion  ContentVersion   @relation(fields: [contentVersionId], references: [id], onDelete: Cascade)
+  actorUser       User             @relation("SimulatedCommentActorUser", fields: [actorUserId], references: [id], onDelete: Restrict)
+  platformAccount PlatformAccount  @relation(fields: [platformAccountId], references: [id], onDelete: Restrict)
+  participant     RunParticipant?  @relation(fields: [participantId], references: [id], onDelete: SetNull)
+  agent           Agent?           @relation(fields: [agentId], references: [id], onDelete: SetNull)
+  journey         AgentJourney?    @relation(fields: [journeyId], references: [id], onDelete: SetNull)
+  journeyAction   AgentTurn?      @relation(fields: [journeyActionId], references: [id], onDelete: SetNull)
+  toolCall        AgentToolCall?  @relation(fields: [toolCallId], references: [id], onDelete: SetNull)
+
+  @@index([contentVersionId, simulatedTime, createdAt, id], map: "idx_comments_content_time")
+  @@index([contentVersionId, likeCount, replyCount, simulatedTime, createdAt, id], map: "idx_comments_content_hot")
+  @@index([actorUserId], map: "idx_comments_actor_user_id")
+  @@index([platformAccountId], map: "idx_comments_platform_account_id")
+  @@map("simulated_comments")
+}
+
+model ActionLog {
+  id                String   @id @default(uuid())
+  runId             String   @map("run_id")
+  contentVersionId  String   @map("content_version_id")
+  participantId     String?  @map("run_participant_id")
+  actorUserId       String?  @map("actor_user_id")
+  platformAccountId String?  @map("platform_account_id")
+  journeyId         String   @map("journey_id")
+  journeyActionId   String   @map("journey_action_id")
+  toolCallId        String?  @map("tool_call_id")
+  simulatedTime     Int      @map("simulated_time")
+  logText           String   @map("log_text")
+  action            String?
+  thoughtText       String?  @map("thought_text")
+  emotion           String?
+  topicTagsJson     Json     @default("[]") @map("topic_tags_json")
+  riskTagsJson      Json     @default("[]") @map("risk_tags_json")
+  createdAt         DateTime @default(now()) @map("created_at")
+
+  run             TestRun          @relation(fields: [runId], references: [id], onDelete: Cascade)
+  contentVersion  ContentVersion   @relation(fields: [contentVersionId], references: [id], onDelete: Cascade)
+  participant     RunParticipant?  @relation(fields: [participantId], references: [id], onDelete: SetNull)
+  actorUser       User?            @relation("ActionLogActorUser", fields: [actorUserId], references: [id], onDelete: SetNull)
+  platformAccount PlatformAccount? @relation(fields: [platformAccountId], references: [id], onDelete: SetNull)
+  journey         AgentJourney     @relation(fields: [journeyId], references: [id], onDelete: Cascade)
+  journeyAction   AgentTurn       @relation(fields: [journeyActionId], references: [id], onDelete: Cascade)
+  toolCall        AgentToolCall?  @relation(fields: [toolCallId], references: [id], onDelete: SetNull)
+
+  @@index([runId, simulatedTime], map: "idx_action_logs_run_time")
+  @@index([contentVersionId, simulatedTime], map: "idx_action_logs_content_time")
+  @@index([participantId], map: "idx_action_logs_participant_id")
+  @@map("action_logs")
+}
+
+model RunLog {
+  id                String   @id @default(uuid())
+  runId             String   @map("run_id")
+  logType           String   @map("log_type")
+  message           String
+  participantId     String?  @map("run_participant_id")
+  actorUserId       String?  @map("actor_user_id")
+  platformAccountId String?  @map("platform_account_id")
+  metadataJson      Json     @default("{}") @map("metadata_json")
+  simulatedTime     Int      @default(0) @map("simulated_time")
+  createdAt         DateTime @default(now()) @map("created_at")
+
+  run             TestRun          @relation(fields: [runId], references: [id], onDelete: Cascade)
+  participant     RunParticipant?  @relation(fields: [participantId], references: [id], onDelete: SetNull)
+  actorUser       User?            @relation("RunLogActorUser", fields: [actorUserId], references: [id], onDelete: SetNull)
+  platformAccount PlatformAccount? @relation(fields: [platformAccountId], references: [id], onDelete: SetNull)
+
+  @@index([runId, logType, simulatedTime, createdAt], map: "idx_run_logs_run_type_time")
+  @@index([runId, simulatedTime, createdAt], map: "idx_run_logs_run_time")
+  @@map("run_logs")
+}
+
+model LlmCallTrace {
+  id                   String   @id @default(uuid())
+  runId                String   @map("run_id")
+  taskType             String   @map("task_type")
+  provider             String?
+  model                String
+  promptVersion        String?  @map("prompt_version")
+  agentTurnId          String?  @map("agent_turn_id")
+  participantId        String?  @map("run_participant_id")
+  jobId                String?  @map("job_id")
+  profileId            String?  @map("profile_id")
+  stepNumber           Int      @default(0) @map("step_number")
+  finishReason         String?  @map("finish_reason")
+  inputTokens          Int?     @map("input_tokens")
+  outputTokens         Int?     @map("output_tokens")
+  totalTokens          Int?     @map("total_tokens")
+  reasoningTokens      Int?     @map("reasoning_tokens")
+  cacheReadTokens      Int?     @map("cache_read_tokens")
+  cacheWriteTokens     Int?     @map("cache_write_tokens")
+  noCacheInputTokens   Int?     @map("no_cache_input_tokens")
+  rawUsageJson         Json?    @map("raw_usage_json")
+  metadataJson         Json     @default("{}") @map("metadata_json")
+  createdAt            DateTime @default(now()) @map("created_at")
+
+  run TestRun @relation(fields: [runId], references: [id], onDelete: Cascade)
+
+  @@index([runId, taskType, createdAt], map: "idx_llm_call_traces_run_task_time")
+  @@index([runId, createdAt], map: "idx_llm_call_traces_run_time")
+  @@index([agentTurnId], map: "idx_llm_call_traces_agent_turn_id")
+  @@map("llm_call_traces")
+}
+
+model RunLlmUsageSummary {
+  runId              String   @id @map("run_id")
+  callCount          Int      @default(0) @map("call_count")
+  inputTokens        Int      @default(0) @map("input_tokens")
+  outputTokens       Int      @default(0) @map("output_tokens")
+  totalTokens        Int      @default(0) @map("total_tokens")
+  reasoningTokens    Int      @default(0) @map("reasoning_tokens")
+  cacheReadTokens    Int      @default(0) @map("cache_read_tokens")
+  cacheWriteTokens   Int      @default(0) @map("cache_write_tokens")
+  noCacheInputTokens Int      @default(0) @map("no_cache_input_tokens")
+  updatedAt          DateTime @updatedAt @map("updated_at")
+
+  run TestRun @relation(fields: [runId], references: [id], onDelete: Cascade)
+
+  @@map("run_llm_usage_summaries")
+}
+
+model Insight {
+  id                        String   @id @default(uuid())
+  contentVersionId          String   @map("content_version_id")
+  level                     String
+  title                     String
+  evidence                  String
+  relatedParticipantIdsJson Json     @default("[]") @map("related_participant_ids_json")
+  relatedUserIdsJson        Json     @default("[]") @map("related_user_ids_json")
+  relatedToolCallIdsJson    Json     @default("[]") @map("related_tool_call_ids_json")
+  relatedCommentIdsJson     Json     @default("[]") @map("related_comment_ids_json")
+  simulatedTime             Int      @map("simulated_time")
+  createdAt                 DateTime @default(now()) @map("created_at")
+
+  contentVersion ContentVersion @relation(fields: [contentVersionId], references: [id], onDelete: Cascade)
+
+  @@index([contentVersionId, simulatedTime], map: "idx_insights_content_time")
+  @@map("insights")
+}
+
+model Report {
+  id                      String   @id @default(uuid())
+  runId                   String   @map("run_id")
+  contentVersionId        String   @map("content_version_id")
+  recommendation          String
+  reportOutputJson        Json     @map("report_output_json")
+  evidencePackJson        Json     @map("evidence_pack_json")
+  model                   String
+  promptVersion           String   @map("prompt_version")
+  createdAt               DateTime @default(now()) @map("created_at")
+  updatedAt               DateTime @updatedAt @map("updated_at")
+
+  run            TestRun        @relation(fields: [runId], references: [id], onDelete: Cascade)
+  contentVersion ContentVersion @relation(fields: [contentVersionId], references: [id], onDelete: Cascade)
+
+  @@unique([runId], map: "ux_reports_run_id")
+  @@map("reports")
+}

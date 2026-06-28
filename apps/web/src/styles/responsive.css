@@ -1,0 +1,400 @@
+@media (max-width: 1360px) {
+  :root {
+    --page-gutter: 18px;
+  }
+
+  .venueShell {
+    padding-top: 16px;
+    padding-bottom: 12px;
+  }
+
+  .venueHud {
+    gap: 8px;
+    padding: 10px 12px;
+  }
+
+  .hudMain {
+    gap: 12px;
+  }
+
+  .hudSnapshot {
+    gap: 10px;
+  }
+
+  .hudClockGroup {
+    gap: 6px;
+  }
+
+  .hudControls {
+    gap: 6px;
+  }
+
+  .hudControls button {
+    min-width: 92px;
+    padding: 0 9px;
+  }
+
+  .venueStage {
+    grid-template-columns: clamp(380px, 28vw, 420px) minmax(600px, 1fr);
+  }
+
+  .generationBoard {
+    grid-template-columns: minmax(340px, 0.6fr) minmax(620px, 1fr);
+  }
+
+  .postAuthor {
+    grid-template-columns: 30px 40px minmax(0, 1fr) 64px 30px;
+  }
+
+  .mockContent h2 {
+    font-size: 19px;
+  }
+
+  .seatGrid {
+    grid-template-columns: repeat(auto-fill, minmax(96px, 1fr));
+    width: 100%;
+    max-width: none;
+    gap: 12px;
+  }
+
+  .toastRail {
+    display: none;
+  }
+}
+
+@media (max-width: 1120px) {
+  .audienceGenerationShell,
+  .venueShell {
+    height: auto;
+    min-height: 100vh;
+    overflow: visible;
+  }
+
+  .venueShell {
+    padding-top: 18px;
+    padding-bottom: 18px;
+  }
+
+  .venueHud,
+  .venueStage,
+  .createBoard,
+  .settingsBoard,
+  .generationHud,
+  .generationBoard {
+    grid-template-columns: 1fr;
+  }
+
+  .venueHud {
+    align-items: stretch;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .hudMain {
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+
+  .hudSnapshot {
+    flex-wrap: wrap;
+    row-gap: 6px;
+  }
+
+  .hudClockGroup {
+    flex-wrap: wrap;
+    white-space: normal;
+  }
+
+  .generationBoard,
+  .venueStage {
+    height: auto;
+  }
+
+  .generationControlPanel {
+    align-items: flex-start;
+    justify-content: flex-start;
+    flex-wrap: wrap;
+    row-gap: 10px;
+  }
+
+  .generationActions {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    width: 100%;
+  }
+
+  .generationActions .ghostButton,
+  .generationActions .primary {
+    width: 100%;
+  }
+
+  .brandBlock,
+  .hudMeasure {
+    border-right: 0;
+  }
+
+  .mockPostPanel .mockMedia {
+    max-height: min(60vh, 520px);
+    min-height: 320px;
+  }
+
+  .planningContentPreview .mockMedia {
+    min-height: 360px;
+  }
+
+  .runtimeConsole {
+    min-height: 360px;
+  }
+
+  .seatGrid {
+    grid-template-columns: repeat(auto-fill, minmax(94px, 1fr));
+    width: 100%;
+    max-width: none;
+  }
+
+  .generationActions {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .planReviewSummary,
+  .planExplanationBlock,
+  .directiveReviewGrid,
+  .directiveEditHeader,
+  .axisInputRow {
+    grid-template-columns: 1fr;
+  }
+
+  .planReviewNavRow {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .directiveCard {
+    scroll-margin-top: 104px;
+  }
+
+  .coverageStrip {
+    width: 100%;
+  }
+
+  .addDirectiveAction {
+    width: 100%;
+  }
+
+  .directiveEditCard {
+    grid-template-columns: 1fr;
+  }
+
+  .audienceCommandComposer {
+    display: grid;
+    grid-template-columns: 1fr;
+  }
+
+  .generationActions .ghostButton,
+  .generationActions .primary,
+  .audienceCommandComposer .primary {
+    width: 100%;
+  }
+
+  .restoreGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .restoreActions {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 720px) {
+  :root {
+    --page-gutter: 12px;
+  }
+
+  .historyItem {
+    grid-template-columns: 72px minmax(0, 1fr);
+    align-items: start;
+  }
+
+  .historyThumb {
+    width: 72px;
+  }
+
+  .historyActions {
+    grid-column: 1 / -1;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    width: 100%;
+  }
+
+  .historyTitleRow {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .historyTitleRow h2 {
+    white-space: normal;
+  }
+
+  .directiveCard {
+    grid-template-columns: 1fr;
+  }
+
+  .directiveReviewOverview .directiveReviewHeader {
+    grid-template-columns: 1fr;
+  }
+
+  .directiveReviewAside {
+    justify-items: start;
+  }
+
+  .directiveReviewActions {
+    justify-content: flex-start;
+  }
+
+  .slotPreviewList {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .audienceIdentityRow {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .audienceIdentityMain {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+
+  .audienceIdentityActions {
+    justify-content: flex-start;
+    padding: 0 10px 8px 50px;
+  }
+
+  .audienceIdentityTooltip {
+    width: min(420px, calc(100vw - 72px));
+  }
+
+  .dialogOverlay {
+    padding: 12px;
+  }
+
+  .audienceCreateDialog {
+    width: calc(100vw - 24px);
+    max-height: calc(100vh - 24px);
+  }
+
+  .audienceCreateDialog header,
+  .audienceCreateDialog footer {
+    padding: 14px;
+  }
+
+  .audienceCreateDialog footer {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .dialogActions {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    width: 100%;
+  }
+
+  .audienceCreateDialog footer .ghostButton,
+  .audienceCreateDialog footer .primary {
+    width: 100%;
+    min-width: 0;
+    padding: 0 10px;
+  }
+
+  .restoreShell {
+    align-items: start;
+    padding: 14px;
+  }
+
+  .restoreHeader,
+  .restoreGrid {
+    padding: 18px;
+  }
+
+  .restoreHeader {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .restoreCopy h1 {
+    max-width: 100%;
+    font-size: 25px;
+  }
+
+  .restoreActions {
+    grid-template-columns: 1fr;
+  }
+
+  .settingsShell {
+    padding-top: 20px;
+    padding-bottom: 36px;
+  }
+
+  .venueHud {
+    padding: 14px;
+    border-radius: 18px;
+  }
+
+  .signalStrip {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .brandBlock {
+    width: 100%;
+  }
+
+  .hudMain {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .hudClockGroup {
+    width: 100%;
+  }
+
+  .hudTimeControl {
+    flex: 1 1 132px;
+  }
+
+  .hudControls,
+  .runtimeConsole header {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .hudControls {
+    width: 100%;
+    margin-left: 0;
+  }
+
+  .hudControls button {
+    justify-content: center;
+  }
+
+  .mockPostPanel,
+  .planningContentPreview,
+  .audiencePanel {
+    border-radius: 18px;
+  }
+
+  .planningContentPreview .mockMedia {
+    min-height: 280px;
+  }
+
+  .commentComposerBar {
+    flex-wrap: wrap;
+  }
+
+  .postActionBar {
+    gap: 0;
+  }
+
+  .seatLegend {
+    flex-wrap: wrap;
+    justify-content: flex-start;
+  }
+}
+

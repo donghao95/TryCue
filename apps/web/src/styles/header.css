@@ -1,0 +1,106 @@
+/* 统一 AppHeader 样式 */
+
+.appHeader {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  margin: 0 auto 12px;
+  padding: 10px var(--page-gutter);
+  border: 2px solid rgba(23, 32, 26, 0.82);
+  border-radius: 8px;
+  background: var(--paper-panel);
+  box-shadow: 5px 5px 0 var(--paper-shadow);
+}
+
+.appHeader-narrow {
+  width: min(100%, var(--page-frame-narrow));
+}
+
+.appHeader-wide {
+  width: min(100%, var(--page-frame-wide));
+}
+
+.appHeader-venueMinimal {
+  width: min(100%, var(--page-frame-wide));
+  min-height: 40px;
+  padding: 6px var(--page-gutter);
+  border: 1px solid var(--paper-line);
+  background: rgba(255, 253, 247, 0.72);
+  box-shadow: none;
+}
+
+.appHeaderLeft {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.appHeaderBrand {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.appHeaderBrand .kicker {
+  margin: 0;
+  color: var(--paper-new);
+  font-size: 12px;
+  font-weight: 760;
+  text-transform: uppercase;
+}
+
+.appHeaderBrand h1 {
+  margin: 0;
+  color: var(--paper-ink);
+  font-size: 22px;
+  line-height: 1.2;
+}
+
+.appHeaderRight {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.appHeaderHomeButton {
+  width: auto;
+  margin: 0;
+  min-height: 42px;
+  padding: 0 14px;
+  border: 1px solid var(--paper-line);
+  border-radius: 8px;
+  background: rgba(255, 253, 247, 0.9);
+  color: #334036;
+  box-shadow: 0 1px 0 rgba(70, 64, 92, 0.035);
+}
+
+.appHeaderHomeButton:hover {
+  border-color: var(--paper-ink);
+  background: #fffdf7;
+  color: var(--paper-ink);
+  box-shadow: 3px 3px 0 rgba(23, 32, 26, 0.08);
+}
+
+.appHeader-venueMinimal .appHeaderHomeButton {
+  min-height: 32px;
+  padding: 0 12px;
+  font-size: 13px;
+}
+
+/* AppHeader 内的辅助导航按钮统一规格 */
+.appHeaderRight .ghostButton,
+.appHeaderRight .primary {
+  width: auto;
+  margin: 0;
+  min-height: 42px;
+  padding: 0 14px;
+  border-radius: 8px;
+  font-size: 14px;
+}
