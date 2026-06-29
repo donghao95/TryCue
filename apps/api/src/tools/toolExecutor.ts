@@ -1244,6 +1244,7 @@ async function commitSharePost(
     toolCallId: toolCall.id,
     simulatedTime
   });
+  const updatedJourney = await tx.agentJourney.findUniqueOrThrow({ where: { id: journey.id } });
   await markToolCommitted(tx, action, toolCall, { postId: action.contentVersionId, status: "shared", shareCount: result.postState.shareCount });
   const toolOutput = { postId: action.contentVersionId, status: "shared", shareCount: result.postState.shareCount };
   const log = await createToolLog(tx, action, audience, toolCall.id, "share_post", `${participantDisplayName(audience)} 分享了这篇内容`, simulatedTime, "tool_call", { toolName: "share_post", input: { postId: action.contentVersionId }, output: toolOutput });
@@ -1258,7 +1259,7 @@ async function commitSharePost(
       }
     }),
     await postStateEvent(tx, action, result.postState, simulatedTime),
-    ...(await emitAudienceEvents(tx, action, journey, audience, "share_post", simulatedTime))
+    ...(await emitAudienceEvents(tx, action, updatedJourney, audience, "share_post", simulatedTime))
   ];
   return { status: "committed", events };
 }
@@ -1288,6 +1289,7 @@ async function commitWriteComment(
   const fixedComment = result.comment;
   const state = result.postState;
   const intent = commentIntentArg(args) ?? "agree";
+  const updatedJourney = await tx.agentJourney.findUniqueOrThrow({ where: { id: journey.id } });
   await markToolCommitted(tx, action, toolCall, { postId: action.contentVersionId, status: "commented", commentId: fixedComment.id, comment: commentView(fixedComment, audience), commentCount: state.commentCount, intent });
   const toolInput = { postId: action.contentVersionId, content, intent, replyToCommentId: replyTo };
   const toolOutput = { postId: action.contentVersionId, status: "commented", commentId: fixedComment.id, commentCount: state.commentCount, intent };
@@ -1324,7 +1326,7 @@ async function commitWriteComment(
       }
     }),
     await postStateEvent(tx, action, state, simulatedTime),
-    ...(await emitAudienceEvents(tx, action, journey, audience, "write_comment", simulatedTime))
+    ...(await emitAudienceEvents(tx, action, updatedJourney, audience, "write_comment", simulatedTime))
   ];
   return { status: "committed", events };
 }
@@ -1350,6 +1352,7 @@ async function commitLikeComment(
     toolCallId: toolCall.id,
     simulatedTime
   });
+  const updatedJourney = await tx.agentJourney.findUniqueOrThrow({ where: { id: journey.id } });
   await markToolCommitted(tx, action, toolCall, { status: "liked_comment", commentId, liked: result.active, likeCount: result.comment.likeCount });
   const toolOutput = { status: "liked_comment", commentId, liked: result.active, likeCount: result.comment.likeCount };
   const log = await createToolLog(tx, action, audience, toolCall.id, "like_comment", `${participantDisplayName(audience)} 点赞了一条评论`, simulatedTime, "tool_call", { toolName: "like_comment", input: { commentId }, output: toolOutput });
@@ -1373,7 +1376,7 @@ async function commitLikeComment(
         log: logView(log, audience)
       }
     }),
-    ...(await emitAudienceEvents(tx, action, journey, audience, "like_comment", simulatedTime))
+    ...(await emitAudienceEvents(tx, action, updatedJourney, audience, "like_comment", simulatedTime))
   ];
   return { status: "committed", events };
 }
