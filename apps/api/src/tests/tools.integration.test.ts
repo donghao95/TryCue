@@ -923,3 +923,86 @@ describe("tool direct commit state machine", () => {
     expect(toolCall.status).toBe("committed");
   });
 });
+
+describe("persistStep post-exit_browsing guard", () => {
+  beforeEach(async () => {
+    await resetDatabase();
+  });
+
+  afterAll(async () => {
+    await prisma.$disconnect();
+  });
+
+  it("persists a step that contains exit_browsing tool call including preceding thought", async () => {
+    const bundle = await createToolTestBundle(true);
+    await executeAiSdkPlannedToolCall(bundle.action.id, {
+      callIndex: 0,
+      toolName: "exit_browsing",
+      args: { reasonCategory: "no_more_action", readingDepth: "full", interestLevel: "medium", trustLevel: "medium" },
+      idempotencyKey: `${bundle.action.runId}:${bundle.action.participantId}:${bundle.action.id}:0`,
+      rawToolCall: { id: "call-exit", type: "function", function: { name: "exit_browsing", arguments: "{}" } }
+    });
+
+    const journey = await prisma.agentJourney.findUniqueOrThrow({ where: { id: bundle.action.journeyId } });
+    expect(journey.status).toBe("finished");
+
+    await persistStep(bundle.action.id, {
+      text: "内容看完了，没什么要补充的，划走吧。",
+      toolCalls: [{ toolCallId: "call-exit", toolName: "exit_browsing", input: { reasonCategory: "no_more_action", readingDepth: "full", interestLevel: "medium", trustLevel: "medium" } }],
+      finishReason: "tool-calls",
+      usage: { promptTokens: 0, completionTokens: 0, totalTokens: 0 },
+      request: { body: { provider: "test" } },
+      response: { body: { provider: "test" } },
+      model: { modelId: "test-model" }
+    } as unknown as StepResult<ToolSet>);
+
+    const turn = await prisma.agentTurn.findUniqueOrThrow({ where: { id: bundle.action.id } });
+    expect(turn.thoughtText).toBe("内容看完了，没什么要补充的，划走吧。");
+    const thoughtLogs = await prisma.actionLog.findMany({
+      where: { journeyActionId: bundle.action.id, action: "thought" }
+    });
+    expect(thoughtLogs.map((log) => log.thoughtText)).toEqual(["内容看完了，没什么要补充的，划走吧。"]);
+  });
+
+  it("does not persist trailing text-only step after journey is finished", async () => {
+    const bundle = await createToolTestBundle(true);
+    await executeAiSdkPlannedToolCall(bundle.action.id, {
+      callIndex: 0,
+      toolName: "exit_browsing",
+      args: { reasonCategory: "no_more_action", readingDepth: "full", interestLevel: "medium", trustLevel: "medium" },
+      idempotencyKey: `${bundle.action.runId}:${bundle.action.participantId}:${bundle.action.id}:0`,
+      rawToolCall: { id: "call-exit", type: "function", function: { name: "exit_browsing", arguments: "{}" } }
+    });
+
+    const journey = await prisma.agentJourney.findUniqueOrThrow({ where: { id: bundle.action.journeyId } });
+    expect(journey.status).toBe("finished");
+
+    await persistStep(bundle.action.id, {
+      text: "内容看完了，没什么要补充的，划走吧。",
+      toolCalls: [{ toolCallId: "call-exit", toolName: "exit_browsing", input: { reasonCategory: "no_more_action", readingDepth: "full", interestLevel: "medium", trustLevel: "medium" } }],
+      finishReason: "tool-calls",
+      usage: { promptTokens: 0, completionTokens: 0, totalTokens: 0 },
+      request: { body: { provider: "test" } },
+      response: { body: { provider: "test" } },
+      model: { modelId: "test-model" }
+    } as unknown as StepResult<ToolSet>);
+
+    await persistStep(bundle.action.id, {
+      text: "任务完成，用户已离开。",
+      toolCalls: [],
+      finishReason: "stop",
+      usage: { promptTokens: 0, completionTokens: 0, totalTokens: 0 },
+      request: { body: { provider: "test" } },
+      response: { body: { provider: "test" } },
+      model: { modelId: "test-model" }
+    } as unknown as StepResult<ToolSet>);
+
+    const turn = await prisma.agentTurn.findUniqueOrThrow({ where: { id: bundle.action.id } });
+    expect(turn.thoughtText).toBe("内容看完了，没什么要补充的，划走吧。");
+    const thoughtLogs = await prisma.actionLog.findMany({
+      where: { journeyActionId: bundle.action.id, action: "thought" },
+      orderBy: { createdAt: "asc" }
+    });
+    expect(thoughtLogs.map((log) => log.thoughtText)).toEqual(["内容看完了，没什么要补充的，划走吧。"]);
+  });
+});

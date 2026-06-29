@@ -484,6 +484,13 @@ export async function persistStep(
   const reasoningText = step.reasoningText?.trim() || null;
   const events = await prisma.$transaction(async (tx) => {
     const current = await tx.agentTurn.findUniqueOrThrow({ where: { id: agentTurnId } });
+    const journey = await tx.agentJourney.findUniqueOrThrow({ where: { id: current.journeyId } });
+    // Guard: after exit_browsing commits, the journey transitions to "finished".
+    // The AI SDK may still emit a trailing assistant-text step with no tool calls.
+    // Skip persisting that step as a thought/action_log to avoid polluting display data.
+    if (journey.status !== "active" && toolCalls.length === 0) {
+      return [];
+    }
     const simulatedTime = await getRunSimulatedTime(tx, current.runId);
     if (trimmedThought || reasoningText || toolCalls.length) {
       await appendAssistantMessageItem(tx, current.journeyId, current.runId, current, trimmedThought, {

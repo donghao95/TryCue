@@ -1,5 +1,5 @@
 import { createOpenAICompatible } from "@ai-sdk/openai-compatible";
-import { generateText, parsePartialJson, stepCountIs, streamText } from "ai";
+import { generateText, hasToolCall, parsePartialJson, stepCountIs, streamText } from "ai";
 import { getSharedCapacityManager, getSharedRateLimitedFetch } from "../llm/rateLimitedFetch.js";
 import { aiSdkTrace } from "../llm/aiSdkTracing.js";
 import { log } from "../logger.js";
@@ -695,7 +695,7 @@ ${JSON.stringify({ profileId: input.profile.profileId, demographics: input.profi
       system: buildAudienceSystemPrompt(context, this.platformName),
       messages,
       tools: createAiSdkToolSet(runtimeContext),
-      stopWhen: stepCountIs(maxSteps),
+      stopWhen: [stepCountIs(maxSteps), hasToolCall("exit_browsing")],
       temperature: TEMPERATURE_BALANCED,
       maxRetries: getSharedCapacityManager().getMaxRetries(),
       abortSignal: context.signal,
