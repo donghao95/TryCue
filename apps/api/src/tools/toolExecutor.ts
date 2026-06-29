@@ -22,7 +22,6 @@ import {
 import { jsonSchema, tool, type StepResult, type Tool, type ToolSet } from "ai";
 import { recordLiveEvent, pushLiveEvent } from "../liveEvents.js";
 import { commentUpdatePatch, commentView, deriveSeatStatus, logView, postStateView } from "../views.js";
-import type { ParsedToolCall } from "../agents/types.js";
 import { getRunSimulatedTime } from "../runtime/clock.js";
 import { parseCommentSort } from "../runtime/comments.js";
 import { createComment, exitBrowsing, likeComment, openPost, readPost, setPostReaction, sharePost, viewComments, type ActorContext } from "../runtime/interactions.js";
@@ -33,11 +32,10 @@ import {
   appendSystemNoticeItem,
   appendToolResultItem,
   buildPostObservation,
-  contentImageUrls,
   renderSessionMessages
 } from "../runtime/agentSessions.js";
 
-import { PROMPT_VERSION_AGENT, PROMPT_VERSION_AGENT_V1 } from "../agents/promptVersions.js";
+import { PROMPT_VERSION_AGENT } from "../agents/promptVersions.js";
 import { MAX_COMMENT_LENGTH } from "@trycue/shared";
 
 export type ActionBundle = {
@@ -1495,43 +1493,6 @@ async function postStateEvent(tx: Prisma.TransactionClient, action: AgentTurn, s
   });
 }
 
-async function finishJourneyWithoutToolTx(
-  tx: Prisma.TransactionClient,
-  journey: AgentJourney,
-  action: AgentTurn,
-  nextStep: number
-) {
-  const hasOpenedPost = await journeyHasOpenedPost(tx, journey);
-  const exitOutcome: JourneyExitOutcome = hasOpenedPost ? "browsed_and_left" : "skipped";
-  const exitReason = hasOpenedPost
-    ? "观众浏览后自然结束本次试映。"
-    : "观众在信息流阶段没有继续浏览。";
-  await tx.agentJourney.update({
-    where: { id: journey.id },
-    data: {
-      status: "finished",
-      runnerStatus: "idle",
-      lockedAt: null,
-      lockedBy: null,
-      heartbeatAt: null,
-      finalSummary: exitReason,
-      exitOutcome,
-      exitReason,
-      completedAt: new Date(),
-      currentStepIndex: nextStep
-    }
-  });
-  await tx.runParticipant.update({
-    where: { id: journey.participantId },
-    data: { runtimeStatus: exitOutcome === "skipped" ? "skipped" : "finished" }
-  });
-  const simulatedTime = await getRunSimulatedTime(tx, journey.runId);
-  return audienceStatusEvent(tx, action, journey, exitOutcome === "skipped" ? "skipped" : "finished", simulatedTime, {
-    exitOutcome,
-    exitReason
-  });
-}
-
 async function finishJourneyAtMaxStepsTx(
   tx: Prisma.TransactionClient,
   journey: AgentJourney,
@@ -1562,7 +1523,7 @@ async function finishJourneyAtMaxStepsTx(
     orderBy: { stepIndex: "desc" }
   });
   const simulatedTime = await getRunSimulatedTime(tx, journey.runId);
-  return audienceStatusEvent(tx, action, journey, "finished", simulatedTime, {
+  return audienceStatusEvent(tx, action, "finished", simulatedTime, {
     exitOutcome: "max_steps",
     exitReason
   });
@@ -1571,7 +1532,6 @@ async function finishJourneyAtMaxStepsTx(
 async function audienceStatusEvent(
   tx: Prisma.TransactionClient,
   action: AgentTurn,
-  journey: AgentJourney,
   status: "finished" | "skipped" | "failed",
   simulatedTime: number,
   extra: Record<string, unknown>
@@ -1773,10 +1733,6 @@ function sortJsonValue(value: unknown): unknown {
 
 function objectRecord(value: unknown): Record<string, unknown> {
   return value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : {};
-}
-
-function stringValue(value: unknown) {
-  return typeof value === "string" && value.trim() ? value.trim() : null;
 }
 
 async function emitAudienceEvents(

@@ -1,7 +1,6 @@
 import { afterAll, beforeEach, describe, expect, it } from "vitest";
 import { rm } from "node:fs/promises";
-import { tmpdir } from "node:os";
-import { join, resolve } from "node:path";
+import { resolve } from "node:path";
 import type { FastifyInstance } from "fastify";
 import { prisma } from "@trycue/db";
 import { buildApp } from "../app.js";

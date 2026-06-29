@@ -11,7 +11,6 @@ import type {
   TestRun
 } from "@trycue/db";
 import type {
-  RunParticipantStatus,
   AudienceDetail,
   AudienceSeat,
   AudienceSeatStatus,

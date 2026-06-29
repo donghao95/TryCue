@@ -18,7 +18,6 @@ import {
   ALL_TOOLS,
   appendInitialObservation,
   buildFeedObservation,
-  buildPostObservation,
   loadJourneyTranscript,
   renderSessionMessages
 } from "./agentSessions.js";
@@ -522,7 +521,7 @@ export class Scheduler {
   }
 
   private async finishJourneyAtMaxStepsTx(tx: Prisma.TransactionClient, journey: AgentJourney, nextStep: number) {
-    const updatedJourney = await tx.agentJourney.update({
+    await tx.agentJourney.update({
       where: { id: journey.id },
       data: {
         status: "finished",
@@ -580,7 +579,7 @@ export class Scheduler {
 
   private async handleAgentJourneyFailure(journeyId: string, error: unknown) {
     const message = error instanceof Error ? error.message : String(error);
-    const runningAction = await prisma.agentTurn.findFirst({
+    await prisma.agentTurn.findFirst({
       where: { journeyId, status: { in: ["created", "context_recorded", "model_calling", "model_returned", "tools_executing"] as AgentTurnStatus[] } },
       orderBy: { stepIndex: "desc" },
       select: { id: true }
