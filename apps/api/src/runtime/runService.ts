@@ -14,18 +14,20 @@ import type {
   CreateAudienceSeatRevisionSuggestionRequest,
   CreateAudienceSamplingDirectiveRequest,
   CreateAudienceSamplingPlanRequest,
-  CreateRunRequest,
   FavoriteAudienceIdentityRequest,
   RetryAudienceIdentitiesRequest,
-  RetryRunRequest,
-  RuntimeLogItem,
-  RunHistoryItem,
   AudienceSamplingPlanView,
-  StartRunRequest,
   UpdateAudienceIdentityRequest,
   UpdateAudienceSamplingDirectiveRequest,
   UpdateAudienceSamplingPlanRequest
-} from "@trycue/shared";
+} from "@trycue/shared/audience";
+import type {
+  CreateRunRequest,
+  RetryRunRequest,
+  RuntimeLogItem,
+  RunHistoryItem,
+  StartRunRequest
+} from "@trycue/shared/run";
 import type { AppConfig } from "../config.js";
 import { ApiError } from "../errors.js";
 import { log } from "../logger.js";

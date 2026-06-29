@@ -1,4 +1,4 @@
-import type { AudienceSeatStatus, RunHistoryItem, RunStatus, RuntimeLogItem } from "@trycue/shared";
+import type { AudienceSeatStatus, RunHistoryItem, RunStatus, RuntimeLogItem } from "@trycue/shared/run";
 import type { AudienceDraft, UiStatus } from "../types.js";
 import i18n from "../i18n.js";
 

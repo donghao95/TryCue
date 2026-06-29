@@ -1,5 +1,5 @@
 import type { FastifyReply } from "fastify";
-import { fail } from "@trycue/shared";
+import { fail } from "@trycue/shared/api";
 import { log } from "./logger.js";
 
 export class ApiError extends Error {

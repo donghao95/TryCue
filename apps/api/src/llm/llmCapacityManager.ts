@@ -15,7 +15,7 @@
  * successes, RPM is increased additively (then concurrency).
  */
 
-import type { LlmCapacitySettings, LlmCapacityStatus } from "@trycue/shared";
+import type { LlmCapacitySettings, LlmCapacityStatus } from "@trycue/shared/llm";
 import { log } from "../logger.js";
 
 type RuntimeState = {

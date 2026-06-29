@@ -1,7 +1,7 @@
 import { EventEmitter } from "node:events";
 import type { Prisma } from "@trycue/db";
 import { prisma } from "@trycue/db";
-import type { LiveEventEnvelope, LiveEventType } from "@trycue/shared";
+import type { LiveEventEnvelope, LiveEventType } from "@trycue/shared/live-events";
 
 type StoredLiveEvent = {
   sequence: string;

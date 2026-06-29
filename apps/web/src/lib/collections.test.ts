@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { CommentItem, LiveSummary } from "@trycue/shared";
+import type { CommentItem, LiveSummary } from "@trycue/shared/run";
 import { mergeById, mergeSeatSummary } from "./collections.js";
 
 const baseSummary: LiveSummary = {

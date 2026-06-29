@@ -1,4 +1,4 @@
-import type { ApiResponse } from "@trycue/shared";
+import type { ApiResponse } from "@trycue/shared/api";
 import i18n from "../i18n.js";
 
 function apiFailure(code: string, message: string, details?: unknown): ApiResponse<never> {

@@ -16,13 +16,13 @@ import {
   selectMainBlocker,
   type EvidencePackInput
 } from "./evidencePack.js";
-import { ReportOutputSchema } from "@trycue/shared";
+import { ReportOutputSchema } from "@trycue/shared/report";
 import type {
   EvidencePack,
   EvidenceBlocker,
   Recommendation,
   ReportOutput
-} from "@trycue/shared";
+} from "@trycue/shared/report";
 import {
   buildFallbackVerdict,
   buildFallbackFunnel,

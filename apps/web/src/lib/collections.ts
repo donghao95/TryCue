@@ -1,4 +1,5 @@
-import type { AudienceSeatsSummary, CommentItem, CommentUpdatePatch, LiveSummary, PostStateView, RuntimeLogItem } from "@trycue/shared";
+import type { AudienceSeatsSummary, CommentItem, LiveSummary, PostStateView, RuntimeLogItem } from "@trycue/shared/run";
+import type { CommentUpdatePatch } from "@trycue/shared/live-events";
 import type { AudienceDraft, UiStatus } from "../types.js";
 
 export function mergeById(items: CommentItem[], incoming: CommentItem[]) {

@@ -1,4 +1,4 @@
-import type { AudienceActionHappenedPayload } from "@trycue/shared";
+import type { AudienceActionHappenedPayload } from "@trycue/shared/live-events";
 import i18n from "../i18n.js";
 
 export function actionText(action: AudienceActionHappenedPayload["action"]) {

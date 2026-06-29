@@ -15,10 +15,10 @@ import {
   type ExitReasonCategory,
   type ExitReadingDepth,
   type InterestTrustLevel,
-  type LiveEventEnvelope,
   type ReadDepth,
   type ToolName
-} from "@trycue/shared";
+} from "@trycue/shared/tool";
+import type { LiveEventEnvelope } from "@trycue/shared/live-events";
 import { jsonSchema, tool, type StepResult, type Tool, type ToolSet } from "ai";
 import { recordLiveEvent, pushLiveEvent } from "../liveEvents.js";
 import { commentUpdatePatch, commentView, deriveSeatStatus, logView, postStateView } from "../views.js";
@@ -36,7 +36,7 @@ import {
 } from "../runtime/agentSessions.js";
 
 import { PROMPT_VERSION_AGENT } from "../agents/promptVersions.js";
-import { MAX_COMMENT_LENGTH } from "@trycue/shared";
+import { MAX_COMMENT_LENGTH } from "@trycue/shared/tool";
 
 export type ActionBundle = {
   action: AgentTurn;

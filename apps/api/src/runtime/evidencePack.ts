@@ -23,15 +23,17 @@ import type {
   Recommendation,
   SegmentKey,
   EvidenceQuality,
+  TargetAudienceFit,
+  ModificationWeight
+} from "@trycue/shared/report";
+import type {
   ExitReasonCategory,
   ExitReadingDepth,
   InterestTrustLevel,
   CommentIntent,
-  ReadDepth,
-  AudienceGroupRole,
-  TargetAudienceFit,
-  ModificationWeight
-} from "@trycue/shared";
+  ReadDepth
+} from "@trycue/shared/tool";
+import type { AudienceGroupRole } from "@trycue/shared/audience";
 
 // ── 输入类型 ──
 

@@ -5,7 +5,7 @@ import type {
   ImpactLevel,
   CostLevel,
   TargetAudienceFit
-} from "@trycue/shared";
+} from "@trycue/shared/report";
 import { useTranslation } from "react-i18next";
 
 // ── Shared helpers ──

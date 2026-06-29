@@ -1,6 +1,6 @@
 import { useState, useCallback } from "react";
+import type { ReportView } from "@trycue/shared/run";
 import type {
-  ReportView,
   ReportOutput,
   EvidencePack,
   EvidenceRef,
@@ -22,7 +22,7 @@ import type {
   KeyFinding,
   RewriteSuggestions,
   RewriteSuggestionItem
-} from "@trycue/shared";
+} from "@trycue/shared/report";
 import { useTranslation } from "react-i18next";
 import { recommendationLabel, formatHistoryDate } from "../lib/format.js";
 import { Charts } from "./Charts.js";

@@ -1,4 +1,4 @@
-import type { LiveSummary, PostStateView } from "@trycue/shared";
+import type { LiveSummary, PostStateView } from "@trycue/shared/run";
 
 export const DEMO_TITLE = "30 岁新手爸妈装修避坑清单！住了半年后悔的 12 个点";
 export const DEMO_BODY = `宝宝出生前我也跟风买了一堆东西，后来才发现很多真的用不上。

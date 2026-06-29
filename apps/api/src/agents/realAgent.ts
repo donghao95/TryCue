@@ -20,7 +20,7 @@ import {
   type AudienceSamplingPlanRevisionProposal,
   type AudienceSeatRevisionMessage,
   type AudienceSeatRevisionProposal
-} from "@trycue/shared";
+} from "@trycue/shared/audience";
 import type { LlmRuntimeConfig } from "../llmConfigStore.js";
 import { validateRealLlmConfig } from "../llmConfigStore.js";
 import type {
@@ -54,7 +54,7 @@ import {
   PROMPT_VERSION_SEAT_REVISION,
   PROMPT_VERSION_AGENT
 } from "./promptVersions.js";
-import { DEFAULT_PLATFORM_NAME } from "@trycue/shared";
+import { DEFAULT_PLATFORM_NAME } from "@trycue/shared/report";
 
 export class RealAgentProvider implements AgentProvider {
   private readonly aiSdkOpenaiCompatible: ReturnType<typeof createOpenAICompatible>;

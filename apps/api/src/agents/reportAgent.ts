@@ -1,4 +1,4 @@
-﻿import { createOpenAICompatible } from "@ai-sdk/openai-compatible";
+import { createOpenAICompatible } from "@ai-sdk/openai-compatible";
 import { generateText } from "ai";
 import { getSharedCapacityManager, getSharedRateLimitedFetch } from "../llm/rateLimitedFetch.js";
 import { aiSdkTrace } from "../llm/aiSdkTracing.js";
@@ -23,7 +23,7 @@ import {
   type KeyFinding,
   type RewriteSuggestions,
   type RewriteSuggestionItem
-} from "@trycue/shared";
+} from "@trycue/shared/report";
 import {
   buildFallbackKeyFindings,
   buildFallbackRewriteSuggestions,

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { extractJson, NdjsonLineBuffer, PlanFrameAccumulator } from "./realAgent.js";
-import type { AudiencePlanFrame } from "@trycue/shared";
+import type { AudiencePlanFrame } from "@trycue/shared/audience";
 
 describe("extractJson", () => {
   it("extracts the first complete JSON object and ignores trailing model text", () => {

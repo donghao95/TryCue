@@ -13,13 +13,15 @@ import type {
   AudienceSamplingPlanRevisionMessage,
   AudienceSamplingPlanRevisionProposal,
   AudienceSeatRevisionMessage,
-  AudienceSeatRevisionProposal,
+  AudienceSeatRevisionProposal
+} from "@trycue/shared/audience";
+import type {
   CommentIntent,
   ExitReasonCategory,
   ExitReadingDepth,
   InterestTrustLevel,
   ReadDepth
-} from "@trycue/shared";
+} from "@trycue/shared/tool";
 import { prisma } from "@trycue/db";
 import type { StepResult, ToolSet } from "ai";
 import {

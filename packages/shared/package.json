@@ -9,6 +9,34 @@
     ".": {
       "types": "./src/index.ts",
       "import": "./src/index.ts"
+    },
+    "./api": {
+      "types": "./src/api.ts",
+      "import": "./src/api.ts"
+    },
+    "./tool": {
+      "types": "./src/tool.ts",
+      "import": "./src/tool.ts"
+    },
+    "./audience": {
+      "types": "./src/audience.ts",
+      "import": "./src/audience.ts"
+    },
+    "./llm": {
+      "types": "./src/llm.ts",
+      "import": "./src/llm.ts"
+    },
+    "./report": {
+      "types": "./src/report.ts",
+      "import": "./src/report.ts"
+    },
+    "./run": {
+      "types": "./src/run.ts",
+      "import": "./src/run.ts"
+    },
+    "./live-events": {
+      "types": "./src/live-events.ts",
+      "import": "./src/live-events.ts"
     }
   },
   "scripts": {

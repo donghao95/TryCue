@@ -10,7 +10,7 @@
  * are coordinated automatically.
  */
 
-import type { LlmCapacitySettings } from "@trycue/shared";
+import type { LlmCapacitySettings } from "@trycue/shared/llm";
 import { LlmCapacityManager } from "./llmCapacityManager.js";
 
 let _sharedManager: LlmCapacityManager | null = null;

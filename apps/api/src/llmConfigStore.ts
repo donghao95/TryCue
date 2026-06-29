@@ -2,7 +2,7 @@ import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import { parse, stringify } from "yaml";
 import { z } from "zod";
-import type { LlmCapacitySettings, LlmRuntimeMode, LlmSettingsRequest, LlmSettingsView } from "@trycue/shared";
+import type { LlmCapacitySettings, LlmRuntimeMode, LlmSettingsRequest, LlmSettingsView } from "@trycue/shared/llm";
 import { capacityForPreset, DEFAULT_CAPACITY_SETTINGS, validateCapacitySettings } from "./llm/capacityPresets.js";
 
 export type LlmRuntimeConfig = {
