@@ -193,6 +193,12 @@ describe("audience events emission", () => {
     expect(events.some((event) => event.eventType === "audience.action_happened")).toBe(false);
   });
 
+  // 注:commitSharePost/commitWriteComment/commitLikeComment 的 emitAudienceEvents 参数
+  // 已对齐为传 updatedJourney(与其他 6 个 commit 一致)。这是防御性对齐:
+  // sharePost/createComment/likeComment 当前不修改 agentJourney,故 journey 在工具执行
+  // 前后相同,无法构造能区分"传旧快照 vs 新快照"的黑盒回归测试。如果未来这些工具
+  // 开始修改 journey 字段,现有的 open_post/like_post 等测试模式可参考扩展。
+
   it("persists viewed comments in tool output and transcript only after view_comments", async () => {
     const { action } = await createToolTestBundle(true);
     await prisma.simulatedComment.create({
