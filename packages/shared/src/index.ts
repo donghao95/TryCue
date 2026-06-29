@@ -1370,11 +1370,6 @@ export function categoryForTool(toolName: ToolName): ToolCategory {
     : "navigation";
 }
 
-/** Whether a tool records a "reading but not interacting" behavior (read_post). */
-export function isReadTool(toolName: ToolName): boolean {
-  return toolName === "read_post";
-}
-
 // ── Shared constants ──
 
 /** Default platform display name */

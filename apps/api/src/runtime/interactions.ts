@@ -1,4 +1,4 @@
-import { Prisma, type AgentJourney, type RunParticipant, type SimulatedPostState, type SocialReactionType } from "@trycue/db";
+import { Prisma, type AgentJourney, type RunParticipant, type SocialReactionType } from "@trycue/db";
 import { ApiError } from "../errors.js";
 import { getRunSimulatedTime } from "./clock.js";
 import { listCommentPage, type CommentSort } from "./comments.js";
@@ -252,7 +252,7 @@ export async function setPostReaction(
         }
       })
     : null;
-  await applyPostReactionDelta(tx, params.runId, params.contentVersionId, params.reactionType, delta);
+  await applyPostReactionDelta(tx, params.contentVersionId, params.reactionType, delta);
   if (active && delta > 0) {
     await recordInteractionEvent(tx, {
       runId: params.runId,
@@ -603,7 +603,6 @@ async function findCommentInContent(tx: Prisma.TransactionClient, runId: string,
 
 async function applyPostReactionDelta(
   tx: Prisma.TransactionClient,
-  runId: string,
   contentVersionId: string,
   reactionType: SocialReactionType,
   delta: number

@@ -1,5 +1,5 @@
 import { createOpenAICompatible } from "@ai-sdk/openai-compatible";
-import { generateText, hasToolCall, parsePartialJson, stepCountIs, streamText } from "ai";
+import { generateText, hasToolCall, stepCountIs, streamText } from "ai";
 import { getSharedCapacityManager, getSharedRateLimitedFetch } from "../llm/rateLimitedFetch.js";
 import { aiSdkTrace } from "../llm/aiSdkTracing.js";
 import { log } from "../logger.js";
@@ -27,7 +27,6 @@ import type {
   AgentProvider,
   ParsedToolCall,
   RunParticipantContext,
-  AudienceProfilePlan,
   AudienceSamplingDirectiveDraft,
   AudienceSamplingDirectiveView,
   AudienceSamplingPlanDraft,
@@ -900,14 +899,6 @@ function firstCompleteJsonValue(raw: string) {
   return null;
 }
 
-function parseToolArgs(raw: string) {
-  try {
-    return JSON.parse(raw || "{}") as Record<string, unknown>;
-  } catch {
-    return {};
-  }
-}
-
 function validateSamplingPlanDraft(value: AudienceSamplingPlanDraft, count: number) {
   if (!value || typeof value !== "object") throw new Error("AUDIENCE_PLAN_FAILED: model did not return an object.");
   if (Number(value.totalCount) !== count) throw new Error("AUDIENCE_PLAN_FAILED: totalCount must match requested count.");
@@ -923,87 +914,6 @@ function validateSamplingPlanDraft(value: AudienceSamplingPlanDraft, count: numb
       throw new Error("AUDIENCE_PLAN_FAILED: directive diversityAxes must be non-empty.");
     }
   }
-}
-
-async function progressFromPartialPlan(raw: string, targetCount: number): Promise<AudiencePlanProgressEvent | null> {
-  const parsed = await parsePartialJson(extractJsonPrefix(raw)).catch(() => null);
-  if (!parsed?.value || typeof parsed.value !== "object" || Array.isArray(parsed.value)) return null;
-  const value = parsed.value as Record<string, unknown>;
-
-  const reasoningTrace = Array.isArray(value.reasoningTrace) ? value.reasoningTrace : [];
-  const dimensions = cleanPartialStringArray(value.dimensions);
-  const directives = Array.isArray(value.directives)
-    ? value.directives.filter((item): item is Record<string, unknown> => Boolean(item && typeof item === "object" && !Array.isArray(item)))
-    : [];
-  const quantityTotal = directives.reduce((total, directive) => total + (typeof directive.quantity === "number" ? directive.quantity : 0), 0);
-
-  if (typeof value.totalCount === "number" && typeof value.planMarkdown === "string") {
-    return {
-      stage: "plan_summary",
-      label: "读取计划说明",
-      detail: `已读取 planMarkdown 和 totalCount；当前 ${directives.length} 组，人数合计 ${quantityTotal}/${targetCount}。`,
-      directiveCount: directives.length,
-      quantityTotal,
-      targetCount
-    };
-  }
-  if (directives.length > 0 && quantityTotal > 0) {
-    return {
-      stage: "quantities",
-      label: "读取人数分配",
-      detail: `已读取 directives[].quantity：${directives.length} 组，人数合计 ${quantityTotal}/${targetCount}。`,
-      directiveCount: directives.length,
-      quantityTotal,
-      targetCount
-    };
-  }
-  if (directives.length > 0) {
-    return {
-      stage: "directives",
-      label: "读取观众分组",
-      detail: `已读取 directives：${directives.length} 个分组草稿。`,
-      directiveCount: directives.length,
-      targetCount
-    };
-  }
-  if (dimensions.length > 0) {
-    return {
-      stage: "dimensions",
-      label: "读取拆分维度",
-      detail: `已读取 dimensions：${dimensions.slice(0, 5).join("、")}`,
-      targetCount
-    };
-  }
-  if (reasoningTrace.length > 0) {
-    return {
-      stage: "public_reasoning",
-      label: "读取公开推理",
-      detail: `已读取 reasoningTrace：${reasoningTrace.length} 条推理片段。`,
-      targetCount
-    };
-  }
-  return null;
-}
-
-async function partialReasoningTraceTexts(raw: string) {
-  const parsed = await parsePartialJson(extractJsonPrefix(raw)).catch(() => null);
-  if (!parsed?.value || typeof parsed.value !== "object" || Array.isArray(parsed.value)) return [];
-  const trace = (parsed.value as Record<string, unknown>).reasoningTrace;
-  if (!Array.isArray(trace)) return [];
-  return trace.flatMap((item) => {
-    if (!item || typeof item !== "object" || Array.isArray(item)) return [];
-    const text = (item as Record<string, unknown>).text;
-    return typeof text === "string" && text.trim() ? [text.trim()] : [];
-  });
-}
-
-function cleanPartialStringArray(value: unknown) {
-  return Array.isArray(value) ? value.filter((item): item is string => typeof item === "string" && item.trim().length > 0) : [];
-}
-
-function extractJsonPrefix(raw: string) {
-  const start = raw.indexOf("{");
-  return start >= 0 ? raw.slice(start) : raw;
 }
 
 function absoluteUrlOrNull(value: string) {
@@ -1035,11 +945,6 @@ function requirePersonaString(value: unknown, field: keyof Omit<GeneratedAudienc
 }
 
 const VALID_MBTI_TYPES = new Set(["INTJ", "INTP", "ENTJ", "ENTP", "INFJ", "INFP", "ENFJ", "ENFP", "ISTJ", "ISFJ", "ESTJ", "ESFJ", "ISTP", "ISFP", "ESTP", "ESFP"]);
-const REQUIRED_DEMOGRAPHICS_FIELDS = ["gender", "ageRange", "cityTier", "lifeStage", "role", "spendingPower"];
-
-function nonEmptyString(value: unknown): value is string {
-  return typeof value === "string" && value.trim().length > 0;
-}
 
 function requireMbtiType(value: unknown): string {
   const raw = typeof value === "string" ? value.trim().toUpperCase() : "";
