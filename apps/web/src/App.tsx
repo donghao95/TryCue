@@ -71,6 +71,7 @@ import { AppHeader } from "./components/AppHeader.js";
 import { AnimatedCommentList, AudienceAvatar, PostAction, SeatCell, VenueHud } from "./components/VenueWidgets.js";
 import { useNavigationGuard } from "./hooks/useNavigationGuard.js";
 import { useLiveEvents, type ConnectionStatus } from "./hooks/useLiveEvents.js";
+import { useCreateDraft, isMeaningfulCreateDraft } from "./hooks/useCreateDraft.js";
 import i18n from "./i18n.js";
 import {
   COMMENT_PAGE_SIZE,
@@ -251,16 +252,6 @@ type AudiencePreparationUiState = {
   reasoningEstimated: boolean;
 };
 
-type CreateDraftState = {
-  title: string;
-  bodyText: string;
-  imageUrls: string[];
-  scale: Scale;
-  customAudienceCount: number;
-};
-
-const CREATE_DRAFT_STORAGE_KEY = "trycue:create-draft:v1";
-
 function emptyAudiencePreparationUiState(runId: string | null = null): AudiencePreparationUiState {
   return {
     runId,
@@ -269,61 +260,6 @@ function emptyAudiencePreparationUiState(runId: string | null = null): AudienceP
     reasoningTokens: 0,
     reasoningEstimated: true
   };
-}
-
-function emptyCreateDraftState(): CreateDraftState {
-  return {
-    title: "",
-    bodyText: "",
-    imageUrls: [],
-    scale: "quick",
-    customAudienceCount: 60
-  };
-}
-
-function normalizeCreateDraftState(value: unknown): CreateDraftState {
-  if (typeof value !== "object" || value === null) return emptyCreateDraftState();
-  const draft = value as Partial<CreateDraftState>;
-  const scale: Scale = draft.scale === "standard" || draft.scale === "custom" ? draft.scale : "quick";
-  const customAudienceCount = typeof draft.customAudienceCount === "number" && Number.isFinite(draft.customAudienceCount)
-    ? Math.min(CUSTOM_AUDIENCE_MAX, Math.max(CUSTOM_AUDIENCE_MIN, Math.round(draft.customAudienceCount)))
-    : 60;
-  return {
-    title: typeof draft.title === "string" ? draft.title : "",
-    bodyText: typeof draft.bodyText === "string" ? draft.bodyText : "",
-    imageUrls: Array.isArray(draft.imageUrls) ? draft.imageUrls.filter((url): url is string => typeof url === "string").slice(0, MAX_POST_IMAGES) : [],
-    scale,
-    customAudienceCount
-  };
-}
-
-function readCreateDraftState(): CreateDraftState {
-  try {
-    const raw = window.localStorage.getItem(CREATE_DRAFT_STORAGE_KEY);
-    return raw ? normalizeCreateDraftState(JSON.parse(raw)) : emptyCreateDraftState();
-  } catch {
-    return emptyCreateDraftState();
-  }
-}
-
-function writeCreateDraftState(draft: CreateDraftState) {
-  try {
-    window.localStorage.setItem(CREATE_DRAFT_STORAGE_KEY, JSON.stringify(normalizeCreateDraftState(draft)));
-  } catch {
-    // localStorage may be unavailable in private mode; the in-memory draft still works for the current page.
-  }
-}
-
-function clearCreateDraftState() {
-  try {
-    window.localStorage.removeItem(CREATE_DRAFT_STORAGE_KEY);
-  } catch {
-    // Ignore storage failures; clearing React state remains the source of truth for the current submit.
-  }
-}
-
-function isMeaningfulCreateDraft(draft: CreateDraftState) {
-  return Boolean(draft.title.trim() || draft.bodyText.trim() || draft.imageUrls.length);
 }
 
 function DiversityAxesEditor({
@@ -623,24 +559,26 @@ function assertLiveEventTypeExhaustive(type: LiveEventType): void {
 export function App() {
   const { t } = useTranslation();
   const [route, setRoute] = useState<AppRoute>(() => parseRoute());
-  const initialCreateDraftRef = useRef<CreateDraftState | null>(null);
-  if (initialCreateDraftRef.current === null) {
-    initialCreateDraftRef.current = route.kind === "workbench" && !route.runId ? readCreateDraftState() : emptyCreateDraftState();
-  }
   const navigationGuard = useNavigationGuard();
   const currentPathRef = useRef(window.location.pathname);
   const isNavigatingRef = useRef(false);
-  const createDraftActiveRef = useRef(route.kind === "workbench" && !route.runId);
-  const [title, setTitle] = useState(() => initialCreateDraftRef.current?.title ?? "");
-  const [bodyText, setBodyText] = useState(() => initialCreateDraftRef.current?.bodyText ?? "");
-  const [scale, setScale] = useState<Scale>(() => initialCreateDraftRef.current?.scale ?? "quick");
-  const [customAudienceCount, setCustomAudienceCount] = useState(() => initialCreateDraftRef.current?.customAudienceCount ?? 60);
-  const [imageUrls, setImageUrls] = useState<string[]>(() => initialCreateDraftRef.current?.imageUrls ?? []);
+  // Derived from run, sampling plan, and job state; do not treat as raw test_runs.status.
+  const [uiStatus, setUiStatus] = useState<UiStatus>(route.kind === "workbench" ? (route.runId ? "restoring" : "draft") : route.kind === "report" ? "completed" : "draft");
+  const {
+    title, setTitle,
+    bodyText, setBodyText,
+    scale, setScale,
+    customAudienceCount, setCustomAudienceCount,
+    imageUrls, setImageUrls,
+    currentCreateDraft,
+    clearDraft: clearCreateDraft,
+    reloadFromStorage: reloadCreateDraftFromStorage,
+    overrideFromContentVersion,
+    setActive: setCreateDraftActive
+  } = useCreateDraft({ route, uiStatus });
   const [selectedImageIndex, setSelectedImageIndex] = useState(0);
   const [isUploadingImages, setIsUploadingImages] = useState(false);
   const [isImageViewerOpen, setIsImageViewerOpen] = useState(false);
-  // Derived from run, sampling plan, and job state; do not treat as raw test_runs.status.
-  const [uiStatus, setUiStatus] = useState<UiStatus>(route.kind === "workbench" ? (route.runId ? "restoring" : "draft") : route.kind === "report" ? "completed" : "draft");
   const [runId, setRunId] = useState(route.kind === "workbench" || route.kind === "report" ? (route.runId ?? "") : "");
   const [, setConnectionStatus] = useState<ConnectionStatus>("idle");
   const [postState, setPostState] = useState<PostStateView>(emptyPostState);
@@ -739,7 +677,6 @@ export function App() {
   const activeImageUrl = imageUrls[selectedImageIndex] ?? coverImageUrl;
   const selectedAudienceCount = scale === "quick" ? 12 : scale === "standard" ? 30 : customAudienceCount;
   const canSubmit = title.trim().length >= 2 && bodyText.trim().length >= 20 && Boolean(coverImageUrl);
-  const currentCreateDraft: CreateDraftState = { title, bodyText, imageUrls, scale, customAudienceCount };
   const routeRunId = route.kind === "workbench" || route.kind === "report" ? (route.runId ?? "") : "";
   const visibleRunId = routeRunId || runId;
   const isWorkbenchRunRestoring = route.kind === "workbench" && Boolean(route.runId) && restoredRunId !== route.runId;
@@ -759,13 +696,6 @@ export function App() {
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
   );
-
-  useEffect(() => {
-    if (route.kind !== "workbench" || route.runId) return;
-    if (!createDraftActiveRef.current) return;
-    if (uiStatus !== "draft" && uiStatus !== "starting") return;
-    writeCreateDraftState(currentCreateDraft);
-  }, [route, title, bodyText, imageUrls, scale, customAudienceCount, uiStatus]);
 
   function emptyCommentsStateFor(targetRunId: string, sort: "latest" | "hot" = "latest"): CommentsState {
     return { runId: targetRunId, items: [], cursor: null, hasMore: false, sort, loading: false };
@@ -972,17 +902,12 @@ export function App() {
       return;
     }
     if (!route.runId) {
-      createDraftActiveRef.current = true;
+      setCreateDraftActive(true);
       activeRunIdRef.current = "";
       restoreRequestSeq.current += 1;
       setRestoredRunId(null);
       setRunId("");
-      const draft = readCreateDraftState();
-      setTitle(draft.title);
-      setBodyText(draft.bodyText);
-      setImageUrls(draft.imageUrls);
-      setScale(draft.scale);
-      setCustomAudienceCount(draft.customAudienceCount);
+      reloadCreateDraftFromStorage();
       setSelectedImageIndex(0);
       clearRuntimeUIState(null);
       setAudienceSeats([]);
@@ -992,7 +917,7 @@ export function App() {
       setUiStatus("draft");
       return;
     }
-    createDraftActiveRef.current = false;
+    setCreateDraftActive(false);
     if (route.kind === "workbench" && route.runId === runId && restoredRunId === route.runId) return;
     seenEventIds.current.clear();
     latestLiveEventSequenceRef.current = null;
@@ -1483,12 +1408,7 @@ export function App() {
     const createdRunId = createResponse.data.runId;
     setRunId(createdRunId);
     setRestoredRunId(createdRunId);
-    clearCreateDraftState();
-    setTitle("");
-    setBodyText("");
-    setImageUrls([]);
-    setScale("quick");
-    setCustomAudienceCount(60);
+    clearCreateDraft();
     await navigateTo({ kind: "workbench", runId: createdRunId }, { replace: true, skipGuard: true });
     if (await startAudiencePlanGeneration(createdRunId, { targetCount: selectedAudienceCount })) {
       void loadAudienceState(createdRunId);
@@ -1514,9 +1434,11 @@ export function App() {
     if (hasRuntimeSnapshot(nextStatus)) setHasRuntimeData(true);
     if (response.data.clock) setRunClock({ ...response.data.clock, receivedAtMs: Date.now() });
     if (response.data.contentVersion) {
-      setTitle(response.data.contentVersion.title);
-      setImageUrls(normalizeImageUrls(response.data.contentVersion.imageUrls, response.data.contentVersion.coverImageUrl));
-      setBodyText(response.data.contentVersion.bodyText ?? response.data.contentVersion.bodyPreview ?? "");
+      overrideFromContentVersion({
+        title: response.data.contentVersion.title,
+        imageUrls: normalizeImageUrls(response.data.contentVersion.imageUrls, response.data.contentVersion.coverImageUrl),
+        bodyText: response.data.contentVersion.bodyText ?? response.data.contentVersion.bodyPreview ?? ""
+      });
     }
     if (shouldLoadAudienceState) await loadAudienceState(id, restoreSeq);
     if (restoreSeq !== restoreRequestSeq.current || id !== activeRunIdRef.current) return;
