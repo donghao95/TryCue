@@ -70,6 +70,7 @@ import { SortableImageTile } from "./components/SortableImageTile.js";
 import { AppHeader } from "./components/AppHeader.js";
 import { AnimatedCommentList, AudienceAvatar, PostAction, SeatCell, VenueHud } from "./components/VenueWidgets.js";
 import { useNavigationGuard } from "./hooks/useNavigationGuard.js";
+import { useLiveEvents, type ConnectionStatus } from "./hooks/useLiveEvents.js";
 import i18n from "./i18n.js";
 import {
   COMMENT_PAGE_SIZE,
@@ -641,7 +642,7 @@ export function App() {
   // Derived from run, sampling plan, and job state; do not treat as raw test_runs.status.
   const [uiStatus, setUiStatus] = useState<UiStatus>(route.kind === "workbench" ? (route.runId ? "restoring" : "draft") : route.kind === "report" ? "completed" : "draft");
   const [runId, setRunId] = useState(route.kind === "workbench" || route.kind === "report" ? (route.runId ?? "") : "");
-  const [, setConnectionStatus] = useState<"idle" | "connecting" | "connected" | "reconnecting" | "closed">("idle");
+  const [, setConnectionStatus] = useState<ConnectionStatus>("idle");
   const [postState, setPostState] = useState<PostStateView>(emptyPostState);
   const [summary, setSummary] = useState<LiveSummary>(emptySummary);
   const [commentsState, setCommentsState] = useState<CommentsState>({
@@ -726,7 +727,6 @@ export function App() {
   const restoreRequestSeq = useRef(0);
   const commentRequestSeq = useRef(0);
   const runtimeLogRequestSeq = useRef(0);
-  const malformedLiveEventNotified = useRef(false);
   const latestLiveEventSequenceRef = useRef<string | null>(null);
   const audienceRevisionRef = useRef<number | null>(null);
   const uiStatusRef = useRef(uiStatus);
@@ -1017,74 +1017,16 @@ export function App() {
     void restoreRun(route.runId, restoreSeq);
   }, [route]);
 
-  useEffect(() => {
-    if (!runId || route.kind === "report" || restoredRunId !== runId || uiStatusRef.current === "completed") return;
-    setConnectionStatus((current) => (current === "idle" ? "connecting" : "reconnecting"));
-    const sourceRunId = runId;
-    const afterSeq = latestLiveEventSequenceRef.current;
-    const sseUrl = afterSeq ? `/api/runs/${runId}/events?after=${encodeURIComponent(afterSeq)}` : `/api/runs/${runId}/events`;
-    const source = new EventSource(sseUrl);
-    source.onopen = () => setConnectionStatus("connected");
-    source.onerror = () => setConnectionStatus("reconnecting");
-    const eventTypes = [
-      "post_state.updated",
-      "comments.page_loaded",
-      "comment.created",
-      "comment.updated",
-      "action_log.created",
-      "summary.updated",
-      "insight.created",
-      "audience.status_updated",
-      "audience.action_happened",
-      "audience.generation.job.started",
-      "audience.generation.job.completed",
-      "audience.generation.job.failed",
-      "audience.generation.job.canceled",
-      "audience.plan.started",
-      "audience.plan.progress",
-      "audience.plan.frame",
-      "audience.plan.ready",
-      "audience.plan.updated",
-      "audience.plan.confirmed",
-      "audience.plan.failed",
-      "audience.profile.expansion.started",
-      "audience.profile.expansion.directive_started",
-      "audience.profile.expansion.directive_ready",
-      "audience.profile.expansion.directive_failed",
-      "audience.profile.expansion.ready",
-      "audience.profile.created",
-      "audience.identity.started",
-      "audience.identity.ready",
-      "audience.identity.failed",
-      "audience.updated",
-      "run.clock.updated",
-      "run.started",
-      "run.pausing",
-      "run.paused",
-      "run.resumed",
-      "run_log.created",
-      "run.completed"
-    ];
-    for (const eventType of eventTypes) {
-      source.addEventListener(eventType, (event) => {
-        let payload: LiveEventEnvelope;
-        try {
-          payload = JSON.parse((event as MessageEvent).data) as LiveEventEnvelope;
-        } catch {
-          if (!malformedLiveEventNotified.current) {
-            malformedLiveEventNotified.current = true;
-            showAppError(t("audienceGen.toast.sseError"));
-          }
-          return;
-        }
-        handleLiveEvent(payload, sourceRunId);
-      });
-    }
-    return () => {
-      source.close();
-      setConnectionStatus("closed");
-    };
-  }, [runId, route.kind, restoredRunId]);
+  useLiveEvents({
+    runId,
+    routeKind: route.kind,
+    restoredRunId,
+    uiStatusRef,
+    latestLiveEventSequenceRef,
+    onEvent: handleLiveEvent,
+    onConnectionStatusChange: setConnectionStatus,
+    onMalformed: () => showAppError(t("audienceGen.toast.sseError"))
+  });
 
   useEffect(() => {
     activeRunIdRef.current = runId;
