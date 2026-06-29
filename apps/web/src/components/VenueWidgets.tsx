@@ -1,7 +1,7 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import { CheckCircle2, FileText, Heart, Home, Loader2, Pause, Play, RotateCcw } from "lucide-react";
 import { useTranslation } from "react-i18next";
-import type { AudienceSeat, AudienceSeatStatus, CommentItem } from "@trycue/shared";
+import type { AudienceSeat, AudienceSeatStatus, CommentItem } from "@trycue/shared/run";
 import type { UiStatus } from "../types.js";
 import { formatClock, formatCompact, formatTime, formatValue, hashSeed, lifecycleLabel, statusLabelForRun } from "../lib/format.js";
 

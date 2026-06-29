@@ -1,7 +1,7 @@
 import type { UIEvent } from "react";
 import { Loader2 } from "lucide-react";
 import { useTranslation } from "react-i18next";
-import type { RuntimeLogItem } from "@trycue/shared";
+import type { RuntimeLogItem } from "@trycue/shared/run";
 import { consoleFilterLabel, formatRuntimeLogText, formatRuntimeLogTime, runtimeLogCategory, sortRuntimeLogs } from "../lib/format.js";
 
 export function RuntimeLogStrip({

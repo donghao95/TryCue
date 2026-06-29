@@ -14,42 +14,46 @@ import { AlertTriangle, CheckCircle2, ChevronLeft, ChevronRight, Eye, Heart, His
 import { useTranslation } from "react-i18next";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
-import { CUSTOM_AUDIENCE_MAX, CUSTOM_AUDIENCE_MIN, CUSTOM_AUDIENCE_TOKEN_WARNING_THRESHOLD } from "@trycue/shared";
+import { CUSTOM_AUDIENCE_MAX, CUSTOM_AUDIENCE_MIN, CUSTOM_AUDIENCE_TOKEN_WARNING_THRESHOLD } from "@trycue/shared/run";
 import type {
   ActionLogItem,
   ActionLogStructuredData,
-  AudienceActionHappenedPayload,
   AudienceDetail,
-  AudiencePlanPreview,
-  AudienceSamplingPlanRevisionMessage,
-  AudienceSamplingPlanRevisionOperation,
-  AudienceSamplingPlanRevisionProposal,
   AudienceSeat,
-  AudienceSeatRevisionMessage,
-  AudienceSeatRevisionOperation,
-  AudienceSeatRevisionProposal,
   AudienceSeatStatus,
-  AudienceStatusUpdatedPayload,
   AudienceSeatsSummary,
   CommentItem,
-  CommentUpdatePatch,
-  CreateAudienceProfileRequest,
-  CreateAudienceSamplingDirectiveRequest,
   InsightItem,
   JourneyExitOutcome,
-  LiveEventEnvelope,
-  LiveEventType,
   LiveSummary,
   PostStateView,
   ReportView,
   RuntimeLogItem,
-  RunClockUpdatedPayload,
   RunOverview,
   RunStatus,
-  Scale,
+  Scale
+} from "@trycue/shared/run";
+import type {
+  AudienceActionHappenedPayload,
+  AudienceStatusUpdatedPayload,
+  CommentUpdatePatch,
+  LiveEventEnvelope,
+  LiveEventType,
+  RunClockUpdatedPayload
+} from "@trycue/shared/live-events";
+import type {
+  AudiencePlanPreview,
+  AudienceSamplingPlanRevisionMessage,
+  AudienceSamplingPlanRevisionOperation,
+  AudienceSamplingPlanRevisionProposal,
+  AudienceSeatRevisionMessage,
+  AudienceSeatRevisionOperation,
+  AudienceSeatRevisionProposal,
+  CreateAudienceProfileRequest,
+  CreateAudienceSamplingDirectiveRequest,
   UpdateAudienceIdentityRequest,
   UpdateAudienceSamplingDirectiveRequest
-} from "@trycue/shared";
+} from "@trycue/shared/audience";
 import { AssistantDialog } from "./components/AssistantDialog.js";
 import type {
   AssistantDialogMessage,

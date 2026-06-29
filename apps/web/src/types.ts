@@ -1,5 +1,11 @@
 import type {
   ActionLogItem,
+  CommentItem,
+  RuntimeLogItem,
+  RunClockSnapshot,
+  RunStatus
+} from "@trycue/shared/run";
+import type {
   AudienceGenerationDirectiveProgress,
   AudienceGenerationJobView,
   AudiencePlanPreview,
@@ -7,12 +13,8 @@ import type {
   AudiencePersonaJson,
   AudienceProfileView,
   AudienceSamplingDirective,
-  AudienceSamplingPlanView,
-  CommentItem,
-  RuntimeLogItem,
-  RunClockSnapshot,
-  RunStatus
-} from "@trycue/shared";
+  AudienceSamplingPlanView
+} from "@trycue/shared/audience";
 
 export type UiStatus = RunStatus | "starting" | "restoring" | "restore_failed" | "report_unavailable";
 

@@ -4,7 +4,7 @@ import type {
   LlmCapacityProbeJobView,
   LlmCapacityProbeRequest,
   LlmCapacityProbeResult
-} from "@trycue/shared";
+} from "@trycue/shared/llm";
 import {
   PROBE_MAX_TOTAL_MS,
   ProbeCancelledError,

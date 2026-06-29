@@ -4,7 +4,6 @@ import type {
   AudienceSamplingDirectiveView,
   AudienceSamplingPlanViewForProvider,
   RunParticipantContext,
-  AudienceProfilePlan,
   GeneratedAudience
 } from "./types.js";
 import type {
@@ -14,13 +13,15 @@ import type {
   AudienceSamplingPlanRevisionMessage,
   AudienceSamplingPlanRevisionProposal,
   AudienceSeatRevisionMessage,
-  AudienceSeatRevisionProposal,
+  AudienceSeatRevisionProposal
+} from "@trycue/shared/audience";
+import type {
   CommentIntent,
   ExitReasonCategory,
   ExitReadingDepth,
   InterestTrustLevel,
   ReadDepth
-} from "@trycue/shared";
+} from "@trycue/shared/tool";
 import { prisma } from "@trycue/db";
 import type { StepResult, ToolSet } from "ai";
 import {
@@ -637,7 +638,7 @@ export class MockAgentProvider implements AgentProvider {
       // 不同 stepIndex 仍有变化以覆盖 read_post / like_comment / write_comment 等分支
       const indexHint = hashString(currentContext.participantId) + currentContext.stepIndex;
       const toolCalls = enrichMockToolCalls(planMockTools(currentContext, indexHint), currentContext);
-      thoughtText = buildThought(currentContext, currentContext.displayName, toolCalls);
+      thoughtText = buildThought(currentContext, toolCalls);
       const enrichedToolCalls = toolCalls.map((call, index) => enrichMockToolCall(currentContext, currentActionId, call, index));
 
       for (const call of enrichedToolCalls) {
@@ -775,16 +776,6 @@ function contentClaimSignal(bodyText: string) {
   const candidates = ["先买基础款", "少量试用", "12 个坑", "12个坑", "住了半年"];
   const hit = candidates.find((candidate) => bodyText.includes(candidate));
   return hit ? `「${hit}」` : "核心建议";
-}
-
-function demoProfileMetadata(profile: AudienceProfilePlan, bodyText = "") {
-  const contentHint = bodyText.includes("温奶器") ? "特别会注意温奶器这类具体用品是否真的容易闲置。" : "";
-  return {
-    profile: `${mockBackgroundForDemographics(profile.demographics as AudienceDemographics)}${contentHint}`,
-    personality: "谨慎务实，会结合自身阶段、预算和真实评论判断可信度。",
-    mbtiType: "ISFJ",
-    responseStyle: "表达口语化，像真实用户的即时反馈，会围绕自己的具体疑问展开。会先看标题和正文结构，再决定是否点开评论、收藏或退出。"
-  };
 }
 
 function mockBackgroundForDemographics(demographics: AudienceDemographics) {
@@ -1085,7 +1076,7 @@ function depthToExitDepth(depth: ReadDepth): ExitReadingDepth {
   }
 }
 
-function buildThought(context: RunParticipantContext, name: string, calls: ParsedToolCall[]): string {
+function buildThought(context: RunParticipantContext, calls: ParsedToolCall[]): string {
   const toolNames = calls.map((call) => call.toolName);
   if (!context.hasOpenedPost && toolNames.includes("exit_browsing")) {
     return `标题和封面都不太相关，先划走。`;

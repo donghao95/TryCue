@@ -7,7 +7,7 @@ import type {
   AudienceSamplingPlanRevisionProposal,
   AudienceSeatRevisionOperation,
   AudienceSeatRevisionProposal
-} from "@trycue/shared";
+} from "@trycue/shared/audience";
 import i18n from "../i18n.js";
 
 export type AssistantStage = "plan" | "seat";

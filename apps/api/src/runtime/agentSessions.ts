@@ -1,14 +1,12 @@
 import type {
-  AgentJourney,
   AgentToolCall,
   AgentTranscriptItem,
   AgentTurn,
   ContentVersion,
   Prisma,
-  RunParticipant,
   SimulatedPostState
 } from "@trycue/db";
-import type { ToolName } from "@trycue/shared";
+import type { ToolName } from "@trycue/shared/tool";
 import type { ModelMessage } from "ai";
 import type { ParsedToolCall } from "../agents/types.js";
 import { prepareModelImageUrls } from "./modelImages.js";

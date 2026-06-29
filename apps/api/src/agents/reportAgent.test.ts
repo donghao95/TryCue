@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { ReportOutputSchema } from "@trycue/shared";
+import { ReportOutputSchema } from "@trycue/shared/report";
 import { buildEvidencePack, recommendFromEvidence, selectMainBlocker, type EvidencePackInput } from "../runtime/evidencePack.js";
 import { coerceReportOutput, assertNoBannedScoreFields, assertNoRealPlatformClaims, assertNoInventedEvidenceRefs } from "./reportAgent.js";
 import { fallbackDiagnosticContent } from "../runtime/reportBuilders.js";

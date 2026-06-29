@@ -15,7 +15,7 @@
  * successes, RPM is increased additively (then concurrency).
  */
 
-import type { LlmCapacitySettings, LlmCapacityStatus } from "@trycue/shared";
+import type { LlmCapacitySettings, LlmCapacityStatus } from "@trycue/shared/llm";
 import { log } from "../logger.js";
 
 type RuntimeState = {
@@ -305,7 +305,7 @@ export class LlmCapacityManager {
     this.release();
   }
 
-  private handleError(error: unknown): void {
+  private handleError(_error: unknown): void {
     // Network errors don't necessarily mean rate limiting.
     // Don't penalize capacity, just release the slot.
     this.release();

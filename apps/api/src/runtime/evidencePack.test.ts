@@ -5,7 +5,7 @@ import {
   selectMainBlocker,
   type EvidencePackInput
 } from "./evidencePack.js";
-import type { EvidenceBlocker, EvidencePack } from "@trycue/shared";
+import type { EvidenceBlocker, EvidencePack } from "@trycue/shared/report";
 
 // -- test fixtures --
 

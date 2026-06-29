@@ -12,7 +12,7 @@
  * its own isolated fetch with direct rate limiting.
  */
 
-import type { LlmCapacityProbeLevelResult, LlmCapacityProbeResult } from "@trycue/shared";
+import type { LlmCapacityProbeLevelResult, LlmCapacityProbeResult } from "@trycue/shared/llm";
 import { log } from "../logger.js";
 
 const PROBE_PROMPT = "不思考，回复1";

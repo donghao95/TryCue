@@ -1,5 +1,6 @@
 import type { Prisma, TestRun } from "@trycue/db";
-import type { RunClockSnapshot, RunClockUpdateReason, RunStatus } from "@trycue/shared";
+import type { RunClockSnapshot, RunStatus } from "@trycue/shared/run";
+import type { RunClockUpdateReason } from "@trycue/shared/live-events";
 import { recordLiveEvent } from "../liveEvents.js";
 
 type RunClock = Pick<TestRun, "clockElapsedMs" | "clockAnchorAt" | "clockScale">;

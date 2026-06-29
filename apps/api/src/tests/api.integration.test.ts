@@ -1,7 +1,6 @@
 import { afterAll, beforeEach, describe, expect, it } from "vitest";
 import { access, mkdir, rm, writeFile } from "node:fs/promises";
-import { tmpdir } from "node:os";
-import { join, resolve } from "node:path";
+import { resolve } from "node:path";
 import type { FastifyInstance } from "fastify";
 import { prisma } from "@trycue/db";
 import { buildApp } from "../app.js";
@@ -1596,7 +1595,7 @@ describe("TryCue API integration", () => {
       create: { contentVersionId: bundle.content.id, exposureCount: 5 },
       update: { exposureCount: 5 }
     });
-    const report = await prisma.report.create({
+    await prisma.report.create({
       data: {
         runId,
         contentVersionId: bundle.content.id,

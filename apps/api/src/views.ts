@@ -11,27 +11,30 @@ import type {
   TestRun
 } from "@trycue/db";
 import type {
-  RunParticipantStatus,
   AudienceDetail,
   AudienceSeat,
   AudienceSeatStatus,
   ActionLogItem,
-  CommentIntent,
   CommentItem,
-  CommentUpdatePatch,
-  EvidencePack,
-  ExitReasonCategory,
-  ExitReadingDepth,
-  InterestTrustLevel,
   InsightItem,
   LiveSummary,
   PostStateView,
-  Recommendation,
-  ReportOutput,
   ReportView,
   RunOverview
-} from "@trycue/shared";
-import { ReportOutputSchema, EvidencePackSchema } from "@trycue/shared";
+} from "@trycue/shared/run";
+import type {
+  CommentIntent,
+  ExitReasonCategory,
+  ExitReadingDepth,
+  InterestTrustLevel
+} from "@trycue/shared/tool";
+import type { CommentUpdatePatch } from "@trycue/shared/live-events";
+import type {
+  EvidencePack,
+  Recommendation,
+  ReportOutput
+} from "@trycue/shared/report";
+import { ReportOutputSchema, EvidencePackSchema } from "@trycue/shared/report";
 import { runClockSnapshot } from "./runtime/clock.js";
 
 export function postStateView(state: SimulatedPostState, viewerState?: Pick<PostStateView, "likedByMe" | "favoritedByMe" | "sharedByMe">): PostStateView {

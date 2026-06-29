@@ -1,5 +1,5 @@
-import type { LlmCapacityPreset, LlmCapacityPresetValues, LlmCapacitySettings } from "@trycue/shared";
-import { LLM_CAPACITY_PRESET_VALUES } from "@trycue/shared";
+import type { LlmCapacityPreset, LlmCapacityPresetValues, LlmCapacitySettings } from "@trycue/shared/llm";
+import { LLM_CAPACITY_PRESET_VALUES } from "@trycue/shared/llm";
 
 /**
  * Preset defaults for LLM capacity configuration.

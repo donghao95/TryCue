@@ -7,9 +7,9 @@ import type {
   AudienceSamplingPlanRevisionMessage,
   AudienceSamplingPlanRevisionProposal,
   AudienceSeatRevisionMessage,
-  AudienceSeatRevisionProposal,
-  ToolName
-} from "@trycue/shared";
+  AudienceSeatRevisionProposal
+} from "@trycue/shared/audience";
+import type { ToolName } from "@trycue/shared/tool";
 import type { ModelMessage } from "ai";
 
 export type AudiencePersona = {

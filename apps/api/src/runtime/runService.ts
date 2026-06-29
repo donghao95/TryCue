@@ -14,18 +14,20 @@ import type {
   CreateAudienceSeatRevisionSuggestionRequest,
   CreateAudienceSamplingDirectiveRequest,
   CreateAudienceSamplingPlanRequest,
-  CreateRunRequest,
   FavoriteAudienceIdentityRequest,
   RetryAudienceIdentitiesRequest,
-  RetryRunRequest,
-  RuntimeLogItem,
-  RunHistoryItem,
   AudienceSamplingPlanView,
-  StartRunRequest,
   UpdateAudienceIdentityRequest,
   UpdateAudienceSamplingDirectiveRequest,
   UpdateAudienceSamplingPlanRequest
-} from "@trycue/shared";
+} from "@trycue/shared/audience";
+import type {
+  CreateRunRequest,
+  RetryRunRequest,
+  RuntimeLogItem,
+  RunHistoryItem,
+  StartRunRequest
+} from "@trycue/shared/run";
 import type { AppConfig } from "../config.js";
 import { ApiError } from "../errors.js";
 import { log } from "../logger.js";
@@ -34,9 +36,9 @@ import type { LlmRuntimeConfig } from "../llmConfigStore.js";
 import { shouldUseRealLlm } from "../llmConfigStore.js";
 import { recordLiveEvent, pushLiveEvent } from "../liveEvents.js";
 import { Scheduler } from "./scheduler.js";
-import { getRunSimulatedTime, recordRunClockUpdatedEvent } from "./clock.js";
+import { recordRunClockUpdatedEvent } from "./clock.js";
 import { createAgentIdentity } from "./identity.js";
-import { admitWaitingAudiences, getNextQueueSeq } from "./queue.js";
+import { admitWaitingAudiences } from "./queue.js";
 import { requireSingleContentVersion } from "./contentVersions.js";
 import { cleanupRuntimeFacts, cleanupParticipantRuntimeFacts } from "./runDataLifecycle.js";
 import { createRunLogWithEvent } from "./runLogs.js";
@@ -2636,14 +2638,6 @@ function jobView(job: {
   };
 }
 
-function profileToProfilePlan(profile: { id: string; samplingLabel: string; demographicsJson: unknown }): AudienceProfilePlan {
-  return {
-    profileId: profile.id,
-    samplingLabel: profile.samplingLabel,
-    demographics: objectRecord(profile.demographicsJson)
-  };
-}
-
 function directiveProgressView(
   directive: { id: string; description: string; quantity: number; expansionStatus: string; expansionError: string | null },
   profiles: Array<{ identityStatus: string }>
@@ -2765,18 +2759,6 @@ function directiveToProviderView(directive: {
     rationale: directive.rationale,
     expansionStatus: directive.expansionStatus ?? undefined,
     expansionError: directive.expansionError ?? null
-  };
-}
-
-function fallbackDirectiveView(profile: { samplingDirectiveId: string | null; samplingLabel: string; sortOrder: number }): AudienceSamplingDirectiveView {
-  return {
-    id: profile.samplingDirectiveId ?? "manual",
-    sortOrder: profile.sortOrder,
-    name: profile.samplingLabel || "手动观众",
-    description: profile.samplingLabel,
-    quantity: 1,
-    diversityAxes: [profile.samplingLabel].filter(Boolean),
-    rationale: `手动新增观众 ${profile.samplingLabel}`
   };
 }
 
@@ -2903,10 +2885,6 @@ function requireMbtiType(value: unknown): string {
     throw new Error(`AUDIENCE_GENERATION_FAILED: persona.mbtiType must be one of 16 MBTI types, received "${value}".`);
   }
   return raw;
-}
-
-function personaSectionText(value: unknown): string {
-  return typeof value === "string" ? value.trim() : "";
 }
 
 function requirePersonaString(value: unknown, field: string): string {

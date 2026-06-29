@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { AlertTriangle, Check, CheckCircle2, ChevronDown, Loader2, RefreshCw, RotateCcw, Save, Zap } from "lucide-react";
-import { LLM_CAPACITY_PRESET_VALUES } from "@trycue/shared";
+import { LLM_CAPACITY_PRESET_VALUES } from "@trycue/shared/llm";
 import type {
   LlmCapacityMode,
   LlmCapacityPreset,
@@ -12,7 +12,7 @@ import type {
   LlmCapacityStatus,
   LlmSettingsView,
   ModelListItem
-} from "@trycue/shared";
+} from "@trycue/shared/llm";
 import { AppHeader } from "../components/AppHeader.js";
 import { ConfirmDialog } from "../components/ConfirmDialog.js";
 import type { NavigationGuard } from "../hooks/useNavigationGuard.js";

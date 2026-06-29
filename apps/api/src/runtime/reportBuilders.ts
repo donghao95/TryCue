@@ -1,4 +1,4 @@
-﻿import type {
+import type {
   EvidencePack,
   EvidenceBlocker,
   Recommendation,
@@ -17,7 +17,7 @@
   KeyFinding,
   RewriteSuggestions,
   RewriteSuggestionItem
-} from "@trycue/shared";
+} from "@trycue/shared/report";
 
 // ── Shared constants (used by both report.ts fallback path and reportAgent.ts real-LLM fallback) ──
 

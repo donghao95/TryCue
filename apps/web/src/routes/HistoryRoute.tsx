@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { AlertTriangle, CheckCircle2, FileText, History, Home, Loader2, Send, Trash2, X } from "lucide-react";
-import type { RunHistoryItem } from "@trycue/shared";
+import type { RunHistoryItem } from "@trycue/shared/run";
 import { AppHeader } from "../components/AppHeader.js";
 import { request } from "../lib/api.js";
 import { canDeleteHistoryRun, formatHistoryDate, historyRunStatusLabel, historyStatusTone, mergeHistoryRuns, primaryHistoryAction } from "../lib/format.js";
