@@ -1009,15 +1009,18 @@ unique(content_version_id, actor_user_id, platform_account_id, cursor, sort)
 | journey_action_id | uuid / text | 历史列名；语义为 AgentTurn |
 | tool_call_id | uuid / text nullable | 历史列名；语义为来源 AgentToolCall |
 | simulated_time | int | 模拟时间 |
-| log_text | text | 前端展示文本 |
+| log_text | text | fallback 展示文案（中文模板） |
 | action | text nullable | 关联动作，如 thought / open_post / write_comment |
 | thought_text | text nullable | 本轮可展示心路历程 |
 | emotion | text nullable | 情绪 |
 | topic_tags_json | jsonb | 标签 |
 | risk_tags_json | jsonb | 风险标签 |
+| event_kind | text | 粗类型：thought / tool_call / system / exception |
+| event_payload_json | jsonb | 结构化原始 payload，包含 toolName/input/output/content 等 |
 | created_at | timestamp | 创建时间 |
 
 注意：`thought_text` 是角色扮演出的用户反应，不是模型隐藏推理链。
+注意：`event_kind` 和 `event_payload_json` 是结构化事实字段，展示文案由 view/frontend 从 payload 派生，不再依赖 `log_text`。
 
 ### run_logs
 

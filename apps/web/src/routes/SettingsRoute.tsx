@@ -341,14 +341,13 @@ export function SettingsRoute({ onHome, registerNavigationGuard }: { onHome: () 
     <main className="settingsShell">
       <AppHeader
         variant="narrow"
-        kicker="TryCue Settings"
         title={t("settings.title")}
         right={settings ? (
           <>
             <button className="ghostButton iconTextButton" type="button" onClick={onHome}>
               {t("settings.backHome")}
             </button>
-            <button className={hasUnsavedChanges ? "primary iconTextButton" : "primary iconTextButton isClean"} type="button" onClick={() => { if (hasUnsavedChanges) setPendingConfirm({ title: t("settings.saveConfirmTitle"), body: t("settings.saveConfirmBody"), confirmLabel: t("settings.saveConfirmLabel"), tone: "primary", onConfirm: () => void saveSettings() }); }} disabled={saving || !hasUnsavedChanges}>
+            <button className={hasUnsavedChanges ? "primary iconTextButton" : "primary iconTextButton isClean"} type="button" onClick={() => void saveSettings()} disabled={saving || !hasUnsavedChanges}>
               {saving ? <Loader2 className="spin" size={16} /> : hasUnsavedChanges ? <Save size={16} /> : <Check size={16} />}
               {saving ? t("settings.saving") : hasUnsavedChanges ? t("settings.saveSettings") : t("settings.saved")}
             </button>

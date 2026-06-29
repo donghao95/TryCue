@@ -67,7 +67,6 @@ export function HistoryRoute({
     <main className="historyShell">
       <AppHeader
         variant="narrow"
-        kicker="TryCue MVP"
         title={t("history.title")}
         right={
           <button className="ghostButton iconTextButton" type="button" onClick={onHome}>

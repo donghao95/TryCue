@@ -75,14 +75,26 @@ export function commentUpdatePatch(comment: SimulatedComment): CommentUpdatePatc
 }
 
 export function logView(log: ActionLog, audience?: RunParticipant | null): ActionLogItem {
+  const payload = objectRecord(log.eventPayloadJson);
   return {
     id: log.id,
     participantId: log.participantId,
+    turnId: log.journeyActionId,
     simulatedTime: log.simulatedTime,
     audienceName: audience ? participantDisplayName(audience) : "AI 观众",
     segment: audience ? participantSamplingLabel(audience) : "",
     text: log.logText,
-    action: log.action
+    action: log.action,
+    kind: log.eventKind,
+    data: {
+      toolName: typeof payload.toolName === "string" ? payload.toolName : undefined,
+      input: objectRecord(payload.input),
+      output: objectRecord(payload.output),
+      content: typeof payload.content === "string" ? payload.content : undefined,
+      reasoningContent: typeof payload.reasoningContent === "string" ? payload.reasoningContent : undefined,
+      source: typeof payload.source === "string" ? payload.source : undefined,
+      displayText: typeof payload.displayText === "string" ? payload.displayText : undefined
+    }
   };
 }
 
@@ -450,14 +462,27 @@ export function audienceDetailView(params: {
       exitInterestLevel: exitStructured.interestLevel,
       exitTrustLevel: exitStructured.trustLevel
     },
-    timeline: params.timeline.map((log) => ({
-      id: log.id,
-      simulatedTime: log.simulatedTime,
-      action: log.action ?? "thought",
-      observableLog: log.logText,
-      innerReaction: log.thoughtText ?? log.logText,
-      decisionReason: inferDecisionReason(log.logText)
-    })),
+    timeline: params.timeline.map((log) => {
+      const payload = objectRecord(log.eventPayloadJson);
+      return {
+        id: log.id,
+        turnId: log.journeyActionId,
+        simulatedTime: log.simulatedTime,
+        action: log.action ?? "thought",
+        kind: log.eventKind,
+        data: {
+          toolName: typeof payload.toolName === "string" ? payload.toolName : undefined,
+          input: objectRecord(payload.input),
+          output: objectRecord(payload.output),
+          content: typeof payload.content === "string" ? payload.content : undefined,
+          reasoningContent: typeof payload.reasoningContent === "string" ? payload.reasoningContent : undefined,
+          source: typeof payload.source === "string" ? payload.source : undefined,
+          displayText: typeof payload.displayText === "string" ? payload.displayText : undefined
+        },
+        observableLog: log.logText,
+        innerReaction: log.thoughtText ?? log.logText
+      };
+    }),
     interactions: params.interactions.map((interaction) => ({
       type: interaction.interactionType,
       simulatedTime: interaction.simulatedTime
@@ -503,14 +528,6 @@ function buildCommentIntentMap(toolCalls: Array<{ toolName: string; input: unkno
     if (commentId && intent) map.set(commentId, intent);
   }
   return map;
-}
-
-function inferDecisionReason(text: string) {
-  if (text.includes("收藏")) return "认为内容有复看价值";
-  if (text.includes("评论") || text.includes("追问")) return "希望获得更具体的信息";
-  if (text.includes("跳过") || text.includes("结束")) return "当前内容未形成继续浏览动机";
-  if (text.includes("点开")) return "标题或封面触发了进一步确认的兴趣";
-  return text;
 }
 
 function inferCommentType(text: string) {

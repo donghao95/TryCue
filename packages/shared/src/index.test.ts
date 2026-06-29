@@ -375,7 +375,7 @@ describe("shared contracts", () => {
         status: "active",
         currentStep: 2
       },
-      timeline: [{ simulatedTime: 10, action: "open_post", observableLog: "打开了帖子", innerReaction: "想确认细节", decisionReason: "标题吸引" }],
+      timeline: [{ turnId: "turn-1", simulatedTime: 10, action: "open_post", kind: "tool_call", observableLog: "打开了帖子", innerReaction: "想确认细节" }],
       interactions: [{ type: "open_post", simulatedTime: 10 }],
       comments: [{ commentText: "好文", simulatedTime: 30, commentType: "feedback", sentiment: "positive" }]
     };

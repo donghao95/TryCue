@@ -503,7 +503,6 @@ export const enUS = {
     aiSimulation: "AI simulation",
     simProgress: "Sim progress",
     simTime: "Sim time",
-    skipN: "Skipped {{count}}",
     failN: "Failed {{count}}",
     resetRun: "Reset run",
     viewReport: "View report",
@@ -540,9 +539,23 @@ export const enUS = {
       finalFeedback: "Final feedback",
       comments: "Comments this run",
       noComments: "No comments.",
+      noCommentsCompact: "No comment this run",
+      commentCount: "{{count}} comments",
       timeline: "Behavior & thought timeline",
       noTimeline: "No timeline events.",
       noBehavior: "No behavior",
+      recap: "Run recap",
+      outcome: "Outcome",
+      noFinalFeedback: "No final feedback yet",
+      exitReview: "Exit review",
+      exitReason: "Exit note",
+      keyEvidence: "Key evidence",
+      evidenceCount: "Showing {{shown}} / {{total}}",
+      fullTimeline: "View full timeline",
+      remainingTimeline: "Remaining timeline",
+      expandTimeline: "Show {{count}} older",
+      collapseTimeline: "Collapse timeline",
+      profileContext: "Persona context",
       exitReasonCategory: "Exit reason",
       exitReadingDepth: "Reading depth",
       exitInterestLevel: "Interest level",
@@ -580,6 +593,7 @@ export const enUS = {
     },
     legend: {
       active: "Active",
+      pending: "Not started",
       left: "Left",
       failed: "Failed",
       doubt: "Doubt",
@@ -633,6 +647,22 @@ export const enUS = {
       comment: "Comment",
       exception: "Exception",
       result: "Result"
+    },
+    actionText: {
+      open_post: "Opened the post",
+      read_post: "Read the post",
+      read_post_skim: "Skimmed the post",
+      read_post_partial: "Read part of the post",
+      read_post_full: "Read the full post",
+      focusPrefix: "Focused on: ",
+      view_comments: "Browsed comments",
+      like_post: "Liked the post",
+      favorite_post: "Favorited the post",
+      share_post: "Shared the post",
+      write_comment: "Left a comment",
+      write_comment_prefix: "Commented: ",
+      like_comment: "Liked a comment",
+      exit_browsing: "Left"
     },
     exitOutcome: {
       skipped: "Skipped",
@@ -884,7 +914,7 @@ export const enUS = {
     listAria: "History list"
   },
   settings: {
-    title: "Model & gateway settings",
+    title: "Settings",
     backHome: "Back to home",
     saveSettings: "Save settings",
     saving: "Saving",
@@ -1029,10 +1059,7 @@ export const enUS = {
       body: "You have unsaved setting changes that will be lost. Leave anyway?",
       confirm: "Leave",
       cancel: "Stay"
-    },
-    saveConfirmTitle: "Save settings?",
-    saveConfirmBody: "Current settings will take effect after saving.",
-    saveConfirmLabel: "Save"
+    }
   },
   audienceDrawer: {
     mbti: {

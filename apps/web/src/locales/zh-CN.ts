@@ -503,7 +503,6 @@ export const zhCN = {
     aiSimulation: "AI 模拟",
     simProgress: "模拟进度",
     simTime: "模拟时间",
-    skipN: "跳过 {{count}}",
     failN: "失败 {{count}}",
     resetRun: "重置试映",
     viewReport: "查看报告",
@@ -540,9 +539,23 @@ export const zhCN = {
       finalFeedback: "最终反馈",
       comments: "本次评论",
       noComments: "暂无评论。",
+      noCommentsCompact: "本次未评论",
+      commentCount: "{{count}} 条评论",
       timeline: "行为与思考时间线",
       noTimeline: "暂无时间线事件。",
       noBehavior: "暂无行为",
+      recap: "本次复盘",
+      outcome: "结果",
+      noFinalFeedback: "暂无最终反馈",
+      exitReview: "离开判断",
+      exitReason: "离开说明",
+      keyEvidence: "关键证据",
+      evidenceCount: "显示 {{shown}} / {{total}}",
+      fullTimeline: "查看完整时间线",
+      remainingTimeline: "其余时间线",
+      expandTimeline: "展开更早 {{count}} 条",
+      collapseTimeline: "收起时间线",
+      profileContext: "画像上下文",
       exitReasonCategory: "离开原因",
       exitReadingDepth: "阅读深度",
       exitInterestLevel: "兴趣程度",
@@ -580,6 +593,7 @@ export const zhCN = {
     },
     legend: {
       active: "进行中",
+      pending: "未开始",
       left: "已离开",
       failed: "失败",
       doubt: "质疑",
@@ -633,6 +647,22 @@ export const zhCN = {
       comment: "评论",
       exception: "异常",
       result: "结果"
+    },
+    actionText: {
+      open_post: "点开了帖子",
+      read_post: "阅读了正文",
+      read_post_skim: "快速扫读了正文",
+      read_post_partial: "认真看了一部分正文",
+      read_post_full: "基本看完了正文",
+      focusPrefix: "关注：",
+      view_comments: "浏览了评论区",
+      like_post: "点赞了这篇内容",
+      favorite_post: "收藏了这篇内容",
+      share_post: "分享了这篇内容",
+      write_comment: "发表了评论",
+      write_comment_prefix: "评论：",
+      like_comment: "点赞了一条评论",
+      exit_browsing: "离开内容"
     },
     exitOutcome: {
       skipped: "跳过",
@@ -884,7 +914,7 @@ export const zhCN = {
     listAria: "历史试映列表"
   },
   settings: {
-    title: "模型与网关设置",
+    title: "设置",
     backHome: "返回主页",
     saveSettings: "保存设置",
     saving: "保存中",
@@ -1029,10 +1059,7 @@ export const zhCN = {
       body: "有未保存的设置改动，离开后会丢失。确认离开吗？",
       confirm: "离开",
       cancel: "留在设置页"
-    },
-    saveConfirmTitle: "保存设置？",
-    saveConfirmBody: "确认后当前设置将生效。",
-    saveConfirmLabel: "保存"
+    }
   },
   audienceDrawer: {
     mbti: {

@@ -898,6 +898,8 @@ model ActionLog {
   emotion           String?
   topicTagsJson     Json     @default("[]") @map("topic_tags_json")
   riskTagsJson      Json     @default("[]") @map("risk_tags_json")
+  eventKind         String   @default("tool_call") @map("event_kind")
+  eventPayloadJson  Json     @default("{}") @map("event_payload_json")
   createdAt         DateTime @default(now()) @map("created_at")
 
   run             TestRun          @relation(fields: [runId], references: [id], onDelete: Cascade)

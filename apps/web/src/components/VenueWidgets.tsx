@@ -1,5 +1,5 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
-import { CheckCircle2, FileText, Heart, Home, Loader2, Pause, Play, RotateCcw, Wifi } from "lucide-react";
+import { CheckCircle2, FileText, Heart, Home, Loader2, Pause, Play, RotateCcw } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import type { AudienceSeat, AudienceSeatStatus, CommentItem } from "@trycue/shared";
 import type { UiStatus } from "../types.js";
@@ -9,10 +9,8 @@ export function VenueHud({
   status,
   totalAudience,
   finishedCount,
-  skippedCount,
   failedCount,
   currentSimulatedTime,
-  connectionStatus,
   hasRuntimeData,
   onPause,
   onResume,
@@ -23,10 +21,8 @@ export function VenueHud({
   status: UiStatus;
   totalAudience: number;
   finishedCount: number;
-  skippedCount: number;
   failedCount: number;
   currentSimulatedTime: number;
-  connectionStatus: string;
   hasRuntimeData: boolean;
   onPause: () => void;
   onResume: () => void;
@@ -80,7 +76,6 @@ export function VenueHud({
         </div>
         <div className="hudSnapshot">
           <HudMeasure title={`${finishedCount}`} suffix={`/ ${totalAudience}`} label={t("venueHud.simProgress")} />
-          {skippedCount > 0 ? <span className="hudAbnormalChip skip">{t("venueHud.skipN", { count: skippedCount })}</span> : null}
           {failedCount > 0 ? <span className="hudAbnormalChip fail">{t("venueHud.failN", { count: failedCount })}</span> : null}
           <div className="hudClockGroup">
             <HudMeasure title={formatClock(currentSimulatedTime)} label={t("venueHud.simTime")} compact />
@@ -119,7 +114,6 @@ export function VenueHud({
           {t("venueHud.backHome")}
         </button>
       </div>
-      {connectionStatus !== "connected" ? <span className="connectionHint"><Wifi size={13} />{connectionStatus}</span> : null}
     </header>
   );
 }
@@ -326,12 +320,12 @@ export function PostAction({
 }
 
 const BEHAVIOR_PRIORITY = [
-  { key: "doubt", icon: "!", title: "质疑" },
-  { key: "comment", icon: "●", title: "评论" },
-  { key: "favorite", icon: "★", title: "收藏" },
-  { key: "share", icon: "↗", title: "分享" },
-  { key: "like", icon: "♥", title: "点赞" },
-  { key: "open", icon: "○", title: "点开" }
+  { key: "doubt", icon: "!" },
+  { key: "comment", icon: "●" },
+  { key: "favorite", icon: "★" },
+  { key: "share", icon: "↗" },
+  { key: "like", icon: "♥" },
+  { key: "open", icon: "○" }
 ] as const;
 
 function getSeatBehaviors(seat: AudienceSeat): Array<(typeof BEHAVIOR_PRIORITY)[number]["key"]> {

@@ -1823,6 +1823,7 @@ Query 示例：`limit=100&cursor=xxx`
     "logs": [
       {
         "id": "log_001",
+        "turnId": "turn_001",
         "simulatedTime": 3,
         "audienceName": "陈琳",
         "segment": "核心用户",
@@ -1977,9 +1978,14 @@ Query 示例：`logType=generation&limit=50&order=desc&cursor=xxx`
         "id": "log_001",
         "simulatedTime": 3,
         "action": "open_post",
+        "kind": "tool_call",
+        "data": {
+          "toolName": "open_post",
+          "input": {},
+          "output": { "postId": "cv_001", "transition": "post_detail_observed" }
+        },
         "observableLog": "被标题里的避坑吸引后点开帖子",
-        "innerReaction": "想确认是否有具体清单",
-        "decisionReason": "最近正在研究宝宝用品"
+        "innerReaction": "想确认是否有具体清单"
       }
     ],
     "interactions": [

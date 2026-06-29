@@ -36,8 +36,8 @@ apps/api/uploads/*
 !apps/api/uploads/demo-trycue-detail.jpg
 !apps/api/uploads/demo-trycue-list.jpg
 
-# Internal prompt evals
-apps/api/src/scripts/prompt-evals/
+# Internal prompt evals (local-only; not tracked to keep eval fixtures private)
+apps/api/src/evals/
 
 # Internal docs that should not be public
 docs/测试api key.txt

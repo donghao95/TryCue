@@ -528,7 +528,13 @@ export async function persistStep(
         action: "thought",
         thoughtText: trimmedThought,
         topicTagsJson: [],
-        riskTagsJson: inferRiskTags(trimmedThought)
+        riskTagsJson: inferRiskTags(trimmedThought),
+        eventKind: "thought",
+        eventPayloadJson: {
+          content: trimmedThought,
+          reasoningContent: reasoningText ?? undefined,
+          source: "agent_thought"
+        } as Prisma.InputJsonValue
       }
     });
     return [await recordLiveEvent(tx, {
@@ -1003,7 +1009,8 @@ async function commitOpenPost(
     favorited: favReaction?.active ?? false
   };
   await appendInitialObservation(tx, journey.id, action.runId, buildPostObservation(contentVersion, result.postState, viewerState));
-  const log = await createToolLog(tx, action, audience, toolCall.id, "open_post", `${participantDisplayName(audience)} 点开了帖子`, simulatedTime);
+  const toolOutput = { postId: contentVersion.id, transition: "post_detail_observed" };
+  const log = await createToolLog(tx, action, audience, toolCall.id, "open_post", `${participantDisplayName(audience)} 点开了帖子`, simulatedTime, "tool_call", { toolName: "open_post", input: {}, output: toolOutput });
   const events = [
     await recordLiveEvent(tx, {
       runId: action.runId,
@@ -1049,7 +1056,9 @@ async function commitReadPost(
     depth,
     focus
   });
-  const log = await createToolLog(tx, action, audience, toolCall.id, "read_post", readPostLogText(participantDisplayName(audience), depth), simulatedTime);
+  const toolInput = { postId: action.contentVersionId, depth, focus };
+  const toolOutput = { postId: action.contentVersionId, status: "read", depth, focus };
+  const log = await createToolLog(tx, action, audience, toolCall.id, "read_post", readPostLogText(participantDisplayName(audience), depth), simulatedTime, "tool_call", { toolName: "read_post", input: toolInput, output: toolOutput });
   const events = [
     await recordLiveEvent(tx, {
       runId: action.runId,
@@ -1096,7 +1105,9 @@ async function commitViewComments(
   const audienceById = new Map(audiences.map((item) => [item.id, item]));
   const comments = page.comments.map((comment) => commentView(comment, comment.participantId ? audienceById.get(comment.participantId) : undefined));
   await markToolCommitted(tx, action, toolCall, { postId: action.contentVersionId, comments, cursor, nextCursor: page.nextCursor, hasMore: page.hasMore, sort });
-  const log = await createToolLog(tx, action, audience, toolCall.id, "view_comments", `${participantDisplayName(audience)} 浏览了评论区`, simulatedTime);
+  const toolInput = { postId: action.contentVersionId, cursor, sort };
+  const toolOutput = { postId: action.contentVersionId, comments: comments.length, cursor, nextCursor: page.nextCursor, hasMore: page.hasMore, sort };
+  const log = await createToolLog(tx, action, audience, toolCall.id, "view_comments", `${participantDisplayName(audience)} 浏览了评论区`, simulatedTime, "tool_call", { toolName: "view_comments", input: toolInput, output: toolOutput });
   const events = [
     await recordLiveEvent(tx, {
       runId: action.runId,
@@ -1151,7 +1162,8 @@ async function commitLikePost(
   const state = await tx.simulatedPostState.findUniqueOrThrow({ where: { contentVersionId: action.contentVersionId } });
   const updatedJourney = await tx.agentJourney.findUniqueOrThrow({ where: { id: journey.id } });
   await markToolCommitted(tx, action, toolCall, { postId: action.contentVersionId, status: "liked", liked: true, likeCount: state.likeCount });
-  const log = await createToolLog(tx, action, audience, toolCall.id, "like_post", `${participantDisplayName(audience)} 点赞了这篇内容`, simulatedTime);
+  const toolOutput = { postId: action.contentVersionId, status: "liked", liked: true, likeCount: state.likeCount };
+  const log = await createToolLog(tx, action, audience, toolCall.id, "like_post", `${participantDisplayName(audience)} 点赞了这篇内容`, simulatedTime, "tool_call", { toolName: "like_post", input: { postId: action.contentVersionId }, output: toolOutput });
   const events = [
     await recordLiveEvent(tx, {
       runId: action.runId,
@@ -1190,7 +1202,8 @@ async function commitFavoritePost(
   const state = await tx.simulatedPostState.findUniqueOrThrow({ where: { contentVersionId: action.contentVersionId } });
   const updatedJourney = await tx.agentJourney.findUniqueOrThrow({ where: { id: journey.id } });
   await markToolCommitted(tx, action, toolCall, { postId: action.contentVersionId, status: "favorited", favorited: true, favoriteCount: state.favoriteCount });
-  const log = await createToolLog(tx, action, audience, toolCall.id, "favorite_post", `${participantDisplayName(audience)} 收藏了这篇内容`, simulatedTime);
+  const toolOutput = { postId: action.contentVersionId, status: "favorited", favorited: true, favoriteCount: state.favoriteCount };
+  const log = await createToolLog(tx, action, audience, toolCall.id, "favorite_post", `${participantDisplayName(audience)} 收藏了这篇内容`, simulatedTime, "tool_call", { toolName: "favorite_post", input: { postId: action.contentVersionId }, output: toolOutput });
   const events = [
     await recordLiveEvent(tx, {
       runId: action.runId,
@@ -1225,7 +1238,8 @@ async function commitSharePost(
     simulatedTime
   });
   await markToolCommitted(tx, action, toolCall, { postId: action.contentVersionId, status: "shared", shareCount: result.postState.shareCount });
-  const log = await createToolLog(tx, action, audience, toolCall.id, "share_post", `${participantDisplayName(audience)} 分享了这篇内容`, simulatedTime);
+  const toolOutput = { postId: action.contentVersionId, status: "shared", shareCount: result.postState.shareCount };
+  const log = await createToolLog(tx, action, audience, toolCall.id, "share_post", `${participantDisplayName(audience)} 分享了这篇内容`, simulatedTime, "tool_call", { toolName: "share_post", input: { postId: action.contentVersionId }, output: toolOutput });
   const events = [
     await recordLiveEvent(tx, {
       runId: action.runId,
@@ -1268,7 +1282,9 @@ async function commitWriteComment(
   const state = result.postState;
   const intent = commentIntentArg(args) ?? "agree";
   await markToolCommitted(tx, action, toolCall, { postId: action.contentVersionId, status: "commented", commentId: fixedComment.id, comment: commentView(fixedComment, audience), commentCount: state.commentCount, intent });
-  const log = await createToolLog(tx, action, audience, toolCall.id, "write_comment", `${participantDisplayName(audience)} 评论：${content}`, simulatedTime);
+  const toolInput = { postId: action.contentVersionId, content, intent, replyToCommentId: replyTo };
+  const toolOutput = { postId: action.contentVersionId, status: "commented", commentId: fixedComment.id, commentCount: state.commentCount, intent };
+  const log = await createToolLog(tx, action, audience, toolCall.id, "write_comment", `${participantDisplayName(audience)} 评论：${content}`, simulatedTime, "tool_call", { toolName: "write_comment", input: toolInput, output: toolOutput });
   const events = [
     await recordLiveEvent(tx, {
       runId: action.runId,
@@ -1328,7 +1344,8 @@ async function commitLikeComment(
     simulatedTime
   });
   await markToolCommitted(tx, action, toolCall, { status: "liked_comment", commentId, liked: result.active, likeCount: result.comment.likeCount });
-  const log = await createToolLog(tx, action, audience, toolCall.id, "like_comment", `${participantDisplayName(audience)} 点赞了一条评论`, simulatedTime);
+  const toolOutput = { status: "liked_comment", commentId, liked: result.active, likeCount: result.comment.likeCount };
+  const log = await createToolLog(tx, action, audience, toolCall.id, "like_comment", `${participantDisplayName(audience)} 点赞了一条评论`, simulatedTime, "tool_call", { toolName: "like_comment", input: { commentId }, output: toolOutput });
   const events = [
     await recordLiveEvent(tx, {
       runId: action.runId,
@@ -1391,7 +1408,8 @@ async function commitExitBrowsing(
     interestLevel,
     trustLevel
   });
-  const log = await createToolLog(tx, action, audience, toolCall.id, "exit_browsing", `${participantDisplayName(audience)} 离开了内容`, simulatedTime);
+  const toolOutput = { status: "finished", exitOutcome, reasonCategory, readingDepth, interestLevel, trustLevel };
+  const log = await createToolLog(tx, action, audience, toolCall.id, "exit_browsing", `${participantDisplayName(audience)} 离开了内容`, simulatedTime, "tool_call", { toolName: "exit_browsing", input: { reasonCategory, readingDepth, interestLevel, trustLevel }, output: toolOutput });
   const events = [
     await recordLiveEvent(tx, {
       runId: action.runId,
@@ -1570,7 +1588,9 @@ async function createToolLog(
   toolCallId: string,
   actionName: string,
   text: string,
-  simulatedTime: number
+  simulatedTime: number,
+  eventKind: string = "tool_call",
+  eventPayload: Record<string, unknown> = {}
 ) {
   return tx.actionLog.create({
     data: {
@@ -1586,7 +1606,9 @@ async function createToolLog(
       logText: text,
       action: actionName,
       topicTagsJson: [],
-      riskTagsJson: inferRiskTags(text)
+      riskTagsJson: inferRiskTags(text),
+      eventKind,
+      eventPayloadJson: eventPayload as Prisma.InputJsonValue
     }
   });
 }

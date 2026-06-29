@@ -1090,6 +1090,7 @@ export type InsightItem = {
 export type ActionLogItem = {
   id: string;
   participantId?: string | null;
+  turnId?: string;
   simulatedTime: number;
   action?: string | null;
   text: string;
@@ -1097,6 +1098,18 @@ export type ActionLogItem = {
   audienceName?: string;
   segment?: string;
   createdAt?: string;
+  kind?: string;
+  data?: ActionLogStructuredData;
+};
+
+export type ActionLogStructuredData = {
+  toolName?: string;
+  input?: Record<string, unknown>;
+  output?: Record<string, unknown>;
+  content?: string;
+  reasoningContent?: string;
+  source?: string;
+  displayText?: string;
 };
 
 export type RuntimeLogItem = {
@@ -1261,11 +1274,13 @@ export type AudienceDetail = {
   };
   timeline: Array<{
     id?: string;
+    turnId?: string;
     simulatedTime: number;
     action: string;
+    kind: string;
+    data?: ActionLogStructuredData;
     observableLog: string;
     innerReaction?: string;
-    decisionReason?: string;
   }>;
   interactions: Array<{
     type: string;

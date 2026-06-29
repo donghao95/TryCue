@@ -17,6 +17,7 @@ import remarkGfm from "remark-gfm";
 import { CUSTOM_AUDIENCE_MAX, CUSTOM_AUDIENCE_MIN, CUSTOM_AUDIENCE_TOKEN_WARNING_THRESHOLD } from "@trycue/shared";
 import type {
   ActionLogItem,
+  ActionLogStructuredData,
   AudienceActionHappenedPayload,
   AudienceDetail,
   AudiencePlanPreview,
@@ -637,7 +638,7 @@ export function App() {
   // Derived from run, sampling plan, and job state; do not treat as raw test_runs.status.
   const [uiStatus, setUiStatus] = useState<UiStatus>(route.kind === "workbench" ? (route.runId ? "restoring" : "draft") : route.kind === "report" ? "completed" : "draft");
   const [runId, setRunId] = useState(route.kind === "workbench" || route.kind === "report" ? (route.runId ?? "") : "");
-  const [connectionStatus, setConnectionStatus] = useState<"idle" | "connecting" | "connected" | "reconnecting" | "closed">("idle");
+  const [, setConnectionStatus] = useState<"idle" | "connecting" | "connected" | "reconnecting" | "closed">("idle");
   const [postState, setPostState] = useState<PostStateView>(emptyPostState);
   const [summary, setSummary] = useState<LiveSummary>(emptySummary);
   const [commentsState, setCommentsState] = useState<CommentsState>({
@@ -2982,7 +2983,6 @@ export function App() {
       <main className="restoreShell">
         <section className="restorePanel" aria-labelledby="notFoundTitle">
           <header className="restoreHeader">
-            <p className="kicker">TryCue MVP</p>
             <span>{t("error.notFoundTitle")}</span>
           </header>
           <div className="restoreGrid">
@@ -3030,7 +3030,6 @@ export function App() {
       <main className="reportRoute">
         <AppHeader
           variant="narrow"
-          kicker="TryCue MVP"
           title={t("venue.reportTitle")}
           right={(
             <>
@@ -3067,7 +3066,6 @@ export function App() {
       <main className="restoreShell">
         <section className="restorePanel" aria-labelledby="restoreTitle">
           <header className="restoreHeader">
-            <p className="kicker">TryCue MVP</p>
             <span>Run restore</span>
           </header>
           <div className="restoreGrid">
@@ -3102,7 +3100,6 @@ export function App() {
         <div className="softOrb leftOrb" />
         <AppHeader
           variant="narrow"
-          kicker="TryCue MVP"
           title={t("home.title")}
           right={(
             <>
@@ -3801,10 +3798,8 @@ export function App() {
         status={uiStatus}
         totalAudience={totalAudience}
         finishedCount={summary.finishedCount}
-        skippedCount={summary.skippedCount}
         failedCount={audienceSeats.filter((seat) => seat.status === "failed").length}
         currentSimulatedTime={currentSimulatedTime}
-        connectionStatus={connectionStatus}
         hasRuntimeData={hasRuntimeData}
         onPause={() => void controlRun("pause")}
         onResume={() => void controlRun("resume")}
@@ -3933,6 +3928,7 @@ export function App() {
 
             <div className="seatLegend" aria-label={t("venue.legendAria")}>
               <span><i className="dot green" />{t("venue.legend.active")}</span>
+              <span><i className="dot hollow" />{t("venue.legend.pending")}</span>
               <span><i className="dot gray" />{t("venue.legend.left")}</span>
               <span><i className="dot red" />{t("venue.legend.failed")}</span>
               <span><i className="legendIcon doubt">!</i>{t("venue.legend.doubt")}</span>
@@ -3975,132 +3971,10 @@ export function App() {
               <button onClick={closeAudienceDetail} aria-label={t("venue.closeDetail")}><X size={20} /></button>
             </header>
             {audienceDetail ? (
-              <div className="drawerBody">
-                <div className="drawerIdentity">
-                  <AudienceAvatar name={audienceDetail.persona.name} seed={audienceDetail.participantId} src={audienceDetail.avatarUrl} />
-                  <div>
-                    <h3>{audienceDetail.persona.name}</h3>
-                    <p>{audienceDetail.persona.segment}</p>
-                  </div>
-                </div>
-                <div className="drawerStatusRow">
-                  <span className="drawerStatusChip">{statusLabel(audienceDetail.journey.status as AudienceSeatStatus)}</span>
-                  {audienceDetail.journey.exitOutcome ? (
-                    <span className="drawerStatusChip muted">{journeyExitOutcomeLabel(audienceDetail.journey.exitOutcome)}</span>
-                  ) : null}
-                </div>
-                <div className="drawerBehaviorBadges">
-                  {(() => {
-                    const badges: Array<{ key: string; icon: string; label: string }> = [];
-                    if (audienceDetail.journey.exitOutcome === "risk_exit") badges.push({ key: "doubt", icon: "!", label: t("venue.legend.doubt") });
-                    const hasComment = audienceDetail.comments.length > 0;
-                    if (hasComment) badges.push({ key: "comment", icon: "●", label: t("venue.legend.comment") });
-                    const interactions = audienceDetail.interactions.map((item) => item.type);
-                    if (interactions.includes("favorite_post")) badges.push({ key: "favorite", icon: "★", label: t("venue.legend.favorite") });
-                    if (interactions.includes("share_post")) badges.push({ key: "share", icon: "↗", label: t("venue.legend.share") });
-                    if (interactions.includes("like_post") || interactions.includes("like_comment")) badges.push({ key: "like", icon: "♥", label: t("venue.legend.like") });
-                    if (interactions.includes("open_post") || interactions.includes("view_comments")) badges.push({ key: "open", icon: "○", label: t("venue.legend.open") });
-                    if (badges.length === 0) return <p className="muted">{t("venue.drawer.noBehavior")}</p>;
-                    return badges.map((badge) => (
-                      <span className={`drawerBehaviorBadge ${badge.key}`} key={badge.key}>
-                        <i>{badge.icon}</i>
-                        {badge.label}
-                      </span>
-                    ));
-                  })()}
-                </div>
-                <DrawerField label={t("venue.drawer.roleBackground")} value={audienceDetail.persona.profile} />
-                <DrawerField label={t("venue.drawer.personality")} value={audienceDetail.persona.personality} />
-                <DrawerField label={t("venue.drawer.mbti")} value={audienceDetail.persona.mbtiType} />
-                <DrawerField label={t("venue.drawer.responseStyle")} value={audienceDetail.persona.responseStyle} />
-                {audienceDetail.journey.finalSummary ? <DrawerField label={t("venue.drawer.finalFeedback")} value={audienceDetail.journey.finalSummary} /> : null}
-                {audienceDetail.journey.exitReasonCategory ||
-                audienceDetail.journey.exitReadingDepth ||
-                audienceDetail.journey.exitInterestLevel ||
-                audienceDetail.journey.exitTrustLevel ? (
-                  <section className="drawerExitFields">
-                    <h4>{t("venue.drawer.exitReasonCategory")}</h4>
-                    <div className="drawerExitGrid">
-                      {audienceDetail.journey.exitReasonCategory ? (
-                        <>
-                          <span className="drawerExitLabel">{t("venue.drawer.exitReasonCategory")}</span>
-                          <span>{t(`venue.exitReasonCategory.${audienceDetail.journey.exitReasonCategory}`)}</span>
-                        </>
-                      ) : null}
-                      {audienceDetail.journey.exitReadingDepth ? (
-                        <>
-                          <span className="drawerExitLabel">{t("venue.drawer.exitReadingDepth")}</span>
-                          <span>{t(`venue.readingDepth.${audienceDetail.journey.exitReadingDepth}`)}</span>
-                        </>
-                      ) : null}
-                      {audienceDetail.journey.exitInterestLevel ? (
-                        <>
-                          <span className="drawerExitLabel">{t("venue.drawer.exitInterestLevel")}</span>
-                          <span>{t(`venue.level.${audienceDetail.journey.exitInterestLevel}`)}</span>
-                        </>
-                      ) : null}
-                      {audienceDetail.journey.exitTrustLevel ? (
-                        <>
-                          <span className="drawerExitLabel">{t("venue.drawer.exitTrustLevel")}</span>
-                          <span>{t(`venue.level.${audienceDetail.journey.exitTrustLevel}`)}</span>
-                        </>
-                      ) : null}
-                    </div>
-                  </section>
-                ) : null}
-                <section className="drawerCommentsSection">
-                  <h4>{t("venue.drawer.comments")}</h4>
-                  {audienceDetail.comments.length ? (
-                    audienceDetail.comments.map((comment, index) => (
-                      <div className="drawerCommentItem" key={index}>
-                        <p className="quote">{comment.commentText}</p>
-                        {comment.intent ? <span className="drawerCommentIntent">{t(`venue.commentIntent.${comment.intent}`)}</span> : null}
-                      </div>
-                    ))
-                  ) : (
-                    <p className="muted">{t("venue.drawer.noComments")}</p>
-                  )}
-                </section>
-                <section className="drawerTimelineSection">
-                  <h4>{t("venue.drawer.timeline")}</h4>
-                  <div className="drawerTimeline">
-                    {(() => {
-                      const liveLogs = (selectedParticipantId ? currentLiveLogsByAudience[selectedParticipantId] : []) ?? [];
-                      const merged = [
-                        ...audienceDetail.timeline.map((item) => ({
-                          id: item.id ?? `tl-${item.simulatedTime}-${item.action}`,
-                          simulatedTime: item.simulatedTime,
-                          action: item.action,
-                          logType: undefined as string | undefined,
-                          observableLog: item.observableLog
-                        })),
-                        ...liveLogs.map((log) => ({
-                          id: log.id,
-                          simulatedTime: log.simulatedTime,
-                          action: log.action ?? undefined,
-                          logType: log.logType,
-                          observableLog: log.text
-                        }))
-                      ];
-                      const deduped = merged.filter((item, index, items) => items.findIndex((other) => other.id === item.id) === index);
-                      const sorted = deduped.sort((a, b) => a.simulatedTime - b.simulatedTime);
-                      const visible = sorted
-                        .map((item) => ({ ...item, kind: classifyDrawerTimelineItem(item.action, item.logType) }))
-                        .filter((item) => item.kind === "thought" || item.kind === "action" || item.kind === "comment" || item.kind === "exception");
-                      if (visible.length === 0) return <p className="muted">{t("venue.drawer.noTimeline")}</p>;
-                      return visible.map((item, index) => (
-                        <div className={`timelineItem timelineItem-${item.kind}`} key={item.id ?? `${item.simulatedTime}-${index}`}>
-                          <span className="timelineTime">{formatTime(item.simulatedTime)}</span>
-                          <div className="timelineContent">
-                            <span className="timelineKind">{timelineKindLabel(item.kind)}</span>
-                            <p>{item.observableLog}</p>
-                          </div>
-                        </div>
-                      ));
-                    })()}
-                  </div>
-                </section>
-              </div>
+              <AudienceDetailDrawerContent
+                audienceDetail={audienceDetail}
+                currentLiveLogs={(selectedParticipantId ? currentLiveLogsByAudience[selectedParticipantId] : []) ?? []}
+              />
             ) : (
               <div className="drawerLoading"><Loader2 className="spin" size={20} />{t("venue.drawerLoading")}</div>
             )}
@@ -4121,6 +3995,273 @@ function timelineKindLabel(kind: DrawerTimelineKind): string {
   if (kind === "comment") return i18n.t("venue.timeline.comment");
   if (kind === "exception") return i18n.t("venue.timeline.exception");
   return i18n.t("venue.timeline.result");
+}
+
+type DrawerTimelineEntry = {
+  id?: string;
+  turnId?: string;
+  simulatedTime: number;
+  action?: string;
+  logType?: string;
+  observableLog: string;
+  kind: DrawerTimelineKind;
+  data?: ActionLogStructuredData;
+};
+
+function buildDrawerTimeline(audienceDetail: AudienceDetail, currentLiveLogs: ActionLogItem[]): DrawerTimelineEntry[] {
+  const merged = [
+    ...audienceDetail.timeline.map((item) => ({
+      id: item.id ?? `tl-${item.simulatedTime}-${item.action}`,
+      turnId: item.turnId,
+      simulatedTime: item.simulatedTime,
+      action: item.action,
+      logType: undefined as string | undefined,
+      observableLog: item.observableLog,
+      data: item.data
+    })),
+    ...currentLiveLogs.map((log) => ({
+      id: log.id,
+      turnId: log.turnId,
+      simulatedTime: log.simulatedTime,
+      action: log.action ?? undefined,
+      logType: log.logType,
+      observableLog: log.text,
+      data: log.data
+    }))
+  ];
+  return merged
+    .filter((item, index, items) => items.findIndex((other) => other.id === item.id) === index)
+    .sort((a, b) => a.simulatedTime - b.simulatedTime)
+    .map((item) => ({ ...item, kind: classifyDrawerTimelineItem(item.action, item.logType) }))
+    .filter((item) => item.kind === "thought" || item.kind === "action" || item.kind === "comment" || item.kind === "exception");
+}
+
+function drawerTimelineKey(item: DrawerTimelineEntry) {
+  return item.id ?? `${item.simulatedTime}-${item.kind}-${item.action ?? ""}-${item.observableLog}`;
+}
+
+function timelineKindOrder(kind: DrawerTimelineKind): number {
+  if (kind === "thought") return 0;
+  if (kind === "action") return 1;
+  if (kind === "comment") return 2;
+  if (kind === "exception") return 3;
+  return 4;
+}
+
+function stripAudienceNamePrefix(text: string, name: string) {
+  const trimmedName = name.trim();
+  if (!trimmedName || !text.startsWith(trimmedName)) return text;
+  return text.slice(trimmedName.length).trimStart();
+}
+
+function timelineActionDisplayText(entry: DrawerTimelineEntry, strippedObservableLog?: string): string {
+  const { t } = i18n;
+  const fallback = strippedObservableLog ?? entry.observableLog;
+  const data = entry.data;
+  if (!data?.toolName) return fallback;
+  const input = data.input ?? {};
+  const output = data.output ?? {};
+  switch (data.toolName) {
+    case "open_post":
+      return t("venue.actionText.open_post");
+    case "read_post": {
+      const depth = typeof input.depth === "string" ? input.depth : typeof output.depth === "string" ? output.depth : undefined;
+      const depthText = depth === "skim" ? t("venue.actionText.read_post_skim")
+        : depth === "partial" ? t("venue.actionText.read_post_partial")
+        : depth === "full" ? t("venue.actionText.read_post_full")
+        : t("venue.actionText.read_post");
+      const focus = Array.isArray(input.focus) ? input.focus.filter((f): f is string => typeof f === "string") : [];
+      if (focus.length > 0) return `${depthText} ${t("venue.actionText.focusPrefix")}${focus.join(" / ")}`;
+      return depthText;
+    }
+    case "view_comments":
+      return t("venue.actionText.view_comments");
+    case "like_post":
+      return t("venue.actionText.like_post");
+    case "favorite_post":
+      return t("venue.actionText.favorite_post");
+    case "share_post":
+      return t("venue.actionText.share_post");
+    case "write_comment": {
+      const content = typeof input.content === "string" ? input.content : undefined;
+      return content ? `${t("venue.actionText.write_comment_prefix")}${content}` : t("venue.actionText.write_comment");
+    }
+    case "like_comment":
+      return t("venue.actionText.like_comment");
+    case "exit_browsing": {
+      const reasonCategory = typeof input.reasonCategory === "string" ? input.reasonCategory : typeof output.reasonCategory === "string" ? output.reasonCategory : undefined;
+      const reasonText = reasonCategory ? t(`venue.exitReasonCategory.${reasonCategory}`, { defaultValue: "" }) : "";
+      return reasonText ? `${t("venue.actionText.exit_browsing")}（${reasonText}）` : t("venue.actionText.exit_browsing");
+    }
+    default:
+      return fallback;
+  }
+}
+
+function AudienceDetailDrawerContent({
+  audienceDetail,
+  currentLiveLogs
+}: {
+  audienceDetail: AudienceDetail;
+  currentLiveLogs: ActionLogItem[];
+}) {
+  const { t } = useTranslation();
+  const [timelineExpanded, setTimelineExpanded] = useState(false);
+  const timeline = buildDrawerTimeline(audienceDetail, currentLiveLogs)
+    .map((item) => ({
+      ...item,
+      observableLog: stripAudienceNamePrefix(item.observableLog, audienceDetail.persona.name)
+    }))
+    .sort((a, b) => {
+      const timeDiff = b.simulatedTime - a.simulatedTime;
+      return timeDiff !== 0 ? timeDiff : timelineKindOrder(a.kind) - timelineKindOrder(b.kind);
+    });
+  const recentTimeline = timeline.slice(0, 5);
+  const olderTimeline = timeline.slice(5);
+  const interactions = audienceDetail.interactions.map((item) => item.type);
+  const badges: Array<{ key: string; icon: string; label: string }> = [];
+  if (audienceDetail.journey.exitOutcome === "risk_exit") badges.push({ key: "doubt", icon: "!", label: t("venue.legend.doubt") });
+  if (audienceDetail.comments.length > 0) badges.push({ key: "comment", icon: "●", label: t("venue.legend.comment") });
+  if (interactions.includes("favorite_post")) badges.push({ key: "favorite", icon: "★", label: t("venue.legend.favorite") });
+  if (interactions.includes("share_post")) badges.push({ key: "share", icon: "↗", label: t("venue.legend.share") });
+  if (interactions.includes("like_post") || interactions.includes("like_comment")) badges.push({ key: "like", icon: "♥", label: t("venue.legend.like") });
+  if (interactions.includes("open_post") || interactions.includes("view_comments")) badges.push({ key: "open", icon: "○", label: t("venue.legend.open") });
+  const hasExitMetrics = Boolean(
+    audienceDetail.journey.exitReasonCategory ||
+    audienceDetail.journey.exitReadingDepth ||
+    audienceDetail.journey.exitInterestLevel ||
+    audienceDetail.journey.exitTrustLevel
+  );
+  const recapText = audienceDetail.journey.finalSummary || audienceDetail.journey.exitReason || t("venue.drawer.noFinalFeedback");
+
+  return (
+    <div className="drawerBody audienceReviewBody">
+      <section className="drawerHero">
+        <div className="drawerIdentity compact">
+          <AudienceAvatar name={audienceDetail.persona.name} seed={audienceDetail.participantId} src={audienceDetail.avatarUrl} />
+          <div>
+            <h3>{audienceDetail.persona.name}</h3>
+            <p>{audienceDetail.persona.segment}</p>
+          </div>
+        </div>
+        <div className="drawerStatusRow">
+          <span className="drawerStatusChip">{statusLabel(audienceDetail.journey.status as AudienceSeatStatus)}</span>
+          {audienceDetail.journey.exitOutcome ? (
+            <span className="drawerStatusChip muted">{journeyExitOutcomeLabel(audienceDetail.journey.exitOutcome)}</span>
+          ) : null}
+        </div>
+        <div className="drawerBehaviorBadges">
+          {badges.length ? badges.map((badge) => (
+            <span className={`drawerBehaviorBadge ${badge.key}`} key={badge.key}>
+              <i>{badge.icon}</i>
+              {badge.label}
+            </span>
+          )) : <p className="muted">{t("venue.drawer.noBehavior")}</p>}
+        </div>
+      </section>
+
+      <section className="drawerReviewCard primaryReview">
+        <div className="drawerSectionTitle">
+          <h4>{t("venue.drawer.recap")}</h4>
+        </div>
+        <div className="drawerInsightList">
+          <DrawerInsight label={t("venue.drawer.finalFeedback")} value={recapText} />
+          {audienceDetail.journey.exitOutcome ? <DrawerInsight label={t("venue.drawer.outcome")} value={journeyExitOutcomeLabel(audienceDetail.journey.exitOutcome)} /> : null}
+          <DrawerInsight label={t("venue.drawer.comments")} value={audienceDetail.comments.length ? t("venue.drawer.commentCount", { count: audienceDetail.comments.length }) : t("venue.drawer.noCommentsCompact")} />
+        </div>
+        {hasExitMetrics ? (
+          <div className="drawerMetricStrip">
+            {audienceDetail.journey.exitReasonCategory ? (
+              <span><i>{t("venue.drawer.exitReasonCategory")}</i>{t(`venue.exitReasonCategory.${audienceDetail.journey.exitReasonCategory}`)}</span>
+            ) : null}
+            {audienceDetail.journey.exitReadingDepth ? (
+              <span><i>{t("venue.drawer.exitReadingDepth")}</i>{t(`venue.readingDepth.${audienceDetail.journey.exitReadingDepth}`)}</span>
+            ) : null}
+            {audienceDetail.journey.exitInterestLevel ? (
+              <span><i>{t("venue.drawer.exitInterestLevel")}</i>{t(`venue.level.${audienceDetail.journey.exitInterestLevel}`)}</span>
+            ) : null}
+            {audienceDetail.journey.exitTrustLevel ? (
+              <span><i>{t("venue.drawer.exitTrustLevel")}</i>{t(`venue.level.${audienceDetail.journey.exitTrustLevel}`)}</span>
+            ) : null}
+          </div>
+        ) : null}
+      </section>
+
+      {audienceDetail.comments.length ? (
+        <section className="drawerReviewCard drawerCommentsSection">
+          <div className="drawerSectionTitle">
+            <h4>{t("venue.drawer.comments")}</h4>
+          </div>
+          {audienceDetail.comments.map((comment, index) => (
+            <div className="drawerCommentItem" key={index}>
+              <p className="quote">{comment.commentText}</p>
+              {comment.intent ? <span className="drawerCommentIntent">{t(`venue.commentIntent.${comment.intent}`)}</span> : null}
+            </div>
+          ))}
+        </section>
+      ) : null}
+
+      <section className="drawerReviewCard drawerTimelineSection">
+        <div className="drawerSectionTitle">
+          <h4>{t("venue.drawer.timeline")}</h4>
+        </div>
+        <TimelineList items={recentTimeline} emptyText={t("venue.drawer.noTimeline")} />
+        {timelineExpanded ? (
+          <div className="remainingTimeline">
+            <TimelineList items={olderTimeline} emptyText={t("venue.drawer.noTimeline")} />
+          </div>
+        ) : null}
+        {olderTimeline.length > 0 ? (
+          <button className="timelineToggleButton" type="button" onClick={() => setTimelineExpanded((expanded) => !expanded)}>
+            {timelineExpanded ? t("venue.drawer.collapseTimeline") : t("venue.drawer.expandTimeline", { count: olderTimeline.length })}
+          </button>
+        ) : null}
+      </section>
+
+      <details className="drawerProfileDetails">
+        <summary>{t("venue.drawer.profileContext")}</summary>
+        <div className="drawerProfileGrid">
+          <DrawerField label={t("venue.drawer.roleBackground")} value={audienceDetail.persona.profile} />
+          <DrawerField label={t("venue.drawer.personality")} value={audienceDetail.persona.personality} />
+          <DrawerField label={t("venue.drawer.mbti")} value={audienceDetail.persona.mbtiType} />
+          <DrawerField label={t("venue.drawer.responseStyle")} value={audienceDetail.persona.responseStyle} />
+        </div>
+      </details>
+    </div>
+  );
+}
+
+function DrawerInsight({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="drawerInsight">
+      <span>{label}</span>
+      <p>{value}</p>
+    </div>
+  );
+}
+
+function TimelineList({ items, emptyText }: { items: DrawerTimelineEntry[]; emptyText: string }) {
+  if (items.length === 0) return <p className="muted">{emptyText}</p>;
+  return (
+    <div className="drawerTimeline">
+      {items.map((item, index) => (
+        <TimelineRow item={item} key={item.id ?? `${drawerTimelineKey(item)}-${index}`} />
+      ))}
+    </div>
+  );
+}
+
+function TimelineRow({ item }: { item: DrawerTimelineEntry }) {
+  const text = timelineActionDisplayText(item);
+  return (
+    <div className={`timelineItem timelineItem-${item.kind}`}>
+      <span className="timelineTime">{formatTime(item.simulatedTime)}</span>
+      <div className="timelineContent">
+        <span className="timelineKind">{timelineKindLabel(item.kind)}</span>
+        <p title={text}>{text}</p>
+      </div>
+    </div>
+  );
 }
 
 function journeyExitOutcomeLabel(outcome: JourneyExitOutcome): string {
@@ -4296,11 +4437,22 @@ function MobileDeviceStatusBar() {
     <div className="mobileStatusBar" aria-hidden="true">
       <strong>{formatDeviceTime(deviceTime)}</strong>
       <div className="mobileStatusIndicators">
-        <span className="networkSpeed">1.98<small>KB/s</small></span>
+        <span className="signalBars" aria-hidden="true"><i /><i /><i /><i /></span>
         <span className="networkType">5G</span>
-        <span className="signalBars"><i /><i /><i /><i /></span>
-        <span className="wifiGlyph"><i /></span>
-        <span className="batteryPill">100</span>
+        <svg className="wifiGlyph" width="17" height="12" viewBox="0 0 17 12" fill="none" aria-hidden="true">
+          <path d="M8.5 11.2a1 1 0 100-2 1 1 0 000 2z" fill="currentColor" />
+          <path d="M5.2 7.4a4.7 4.7 0 016.6 0" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
+          <path d="M2.8 5a8.2 8.2 0 0111.4 0" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
+          <path d="M0.5 2.6a11.8 11.8 0 0116 0" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
+        </svg>
+        <span className="batteryWrap" aria-hidden="true">
+          <span className="batteryPct">100</span>
+          <svg className="batteryGlyph" width="26" height="13" viewBox="0 0 26 13" fill="none">
+            <rect x="0.5" y="0.5" width="21" height="12" rx="3.2" ry="3.2" stroke="currentColor" strokeOpacity="0.42" fill="none" />
+            <rect x="23" y="4" width="2" height="5" rx="1" ry="1" fill="currentColor" fillOpacity="0.42" />
+            <rect x="2" y="2" width="18" height="9" rx="1.8" ry="1.8" fill="currentColor" />
+          </svg>
+        </span>
       </div>
     </div>
   );

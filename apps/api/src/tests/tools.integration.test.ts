@@ -108,6 +108,16 @@ describe("audience events emission", () => {
     expect(afterState.commentCount).toBe(beforeState.commentCount);
     expect(afterState.shareCount).toBe(beforeState.shareCount);
 
+    const actionLog = await prisma.actionLog.findFirstOrThrow({
+      where: { journeyActionId: action.id, action: "read_post" }
+    });
+    expect(actionLog.eventKind).toBe("tool_call");
+    expect(actionLog.eventPayloadJson).toMatchObject({
+      toolName: "read_post",
+      input: { postId: action.contentVersionId, depth: "partial", focus: ["price"] },
+      output: { postId: action.contentVersionId, status: "read", depth: "partial", focus: ["price"] }
+    });
+
     const events = await prisma.liveEvent.findMany({ where: { runId: run.id } });
     const actionEvent = events.find((e) => e.eventType === "audience.action_happened");
     expect(actionEvent).toBeTruthy();
@@ -724,6 +734,7 @@ describe("tool direct commit state machine", () => {
 
     await persistStep(bundle.action.id, {
       text: "测试想法",
+      reasoningText: "模型推理文本",
       toolCalls: [{ toolCallId: "call-1", toolName: "open_post", input: {} }],
       finishReason: "tool_calls",
       usage: { promptTokens: 10, completionTokens: 5, totalTokens: 15 },
@@ -744,6 +755,16 @@ describe("tool direct commit state machine", () => {
     ]);
     expect(turn.model).toBe("gpt-4o-mini");
     expect(turn.promptVersion).toBe(PROMPT_VERSION_AGENT);
+
+    const thoughtLog = await prisma.actionLog.findFirstOrThrow({
+      where: { journeyActionId: bundle.action.id, action: "thought" }
+    });
+    expect(thoughtLog.eventKind).toBe("thought");
+    expect(thoughtLog.eventPayloadJson).toMatchObject({
+      content: "测试想法",
+      reasoningContent: "模型推理文本",
+      source: "agent_thought"
+    });
   });
 
   it("redacts sensitive audit fields and fills missing audit fallbacks", async () => {

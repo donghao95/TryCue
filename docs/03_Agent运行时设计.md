@@ -1478,6 +1478,14 @@ Reusable identity / asset facts（reset-runtime 不动，delete-run 引用检查
   User, Agent, PlatformAccount, Asset
 ```
 
+ActionLog 是统一结构化时间线事实表。每条记录包含：
+- `event_kind`：粗类型（thought / tool_call / system / exception）
+- `event_payload_json`：结构化原始 payload（toolName / input / output / content 等）
+- `log_text`：fallback 展示文案
+- `action`：工具名或 "thought"
+
+展示文案由 view/frontend 从结构化 payload 派生，不再依赖数据库中的中文 `log_text`。
+
 ### 10.3 reset-runtime
 
 `POST /api/runs/:runId/reset-runtime` 只允许在 `audience_ready | paused | completed` 状态执行。
