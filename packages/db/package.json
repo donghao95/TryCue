@@ -27,7 +27,7 @@
   "devDependencies": {
     "@types/better-sqlite3": "^7.6.13",
     "prisma": "6.19.3",
-    "tsx": "^4.20.6"
+    "tsx": "^4.22.4"
   },
   "prisma": {
     "seed": "tsx src/seedDemo.ts"
