@@ -3,7 +3,7 @@ import type { Prisma } from "@trycue/db";
 import { prisma } from "@trycue/db";
 import type { LiveEventEnvelope, LiveEventType } from "@trycue/shared/live-events";
 
-type StoredLiveEvent = {
+export type StoredLiveEvent = {
   sequence: string;
   eventType: string;
   payload: LiveEventEnvelope;
