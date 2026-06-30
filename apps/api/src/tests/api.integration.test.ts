@@ -147,13 +147,7 @@ describe("TryCue API integration", () => {
     expect(openPostCounts.some((c) => c > 0)).toBe(true);
     expect(openPostCounts.some((c) => c === 0)).toBe(true);
     expect(await prisma.agentJourney.count({ where: { runId, exitOutcome: "skipped" } })).toBeGreaterThan(0);
-    expect(await prisma.agentToolCall.count({
-      where: {
-        runId,
-        toolName: "exit_browsing",
-        input: { path: "$.readingDepth", equals: "feed_only" }
-      }
-    })).toBeGreaterThan(0);
+    expect(await countFeedOnlyExitBrowsingCalls(runId)).toBeGreaterThan(0);
     await app.close();
   }, 90_000);
 
@@ -179,13 +173,7 @@ describe("TryCue API integration", () => {
     expect(openPostCounts.some((count) => count > 0)).toBe(true);
     expect(openPostCounts.some((count) => count === 0)).toBe(true);
     expect(await prisma.agentJourney.count({ where: { runId, exitOutcome: "skipped" } })).toBeGreaterThan(0);
-    expect(await prisma.agentToolCall.count({
-      where: {
-        runId,
-        toolName: "exit_browsing",
-        input: { path: "$.readingDepth", equals: "feed_only" }
-      }
-    })).toBeGreaterThan(0);
+    expect(await countFeedOnlyExitBrowsingCalls(runId)).toBeGreaterThan(0);
 
     await app.close();
   }, 90_000);
@@ -1837,4 +1825,21 @@ async function describeRunProgress(runId: string) {
     turns,
     reportCount
   });
+}
+
+/**
+ * 统计 run 内 readingDepth=feed_only 的 exit_browsing tool call 数量。
+ *
+ * 不使用 Prisma JSON path filter (`input: { path: "$.readingDepth", equals: "feed_only" }`),
+ * 因为 SQLite 下 Prisma 对 JSON path 的支持依赖 json_extract(),行为与 PostgreSQL 不一致,
+ * 对类型 coercion 和 nested path 有已知问题。改为先查 tool calls 再在 JS 里过滤,跨库一致。
+ */
+async function countFeedOnlyExitBrowsingCalls(runId: string) {
+  const exitBrowsingCalls = await prisma.agentToolCall.findMany({
+    where: { runId, toolName: "exit_browsing" },
+    select: { input: true }
+  });
+  return exitBrowsingCalls.filter(
+    (call) => (call.input as { readingDepth?: string } | null)?.readingDepth === "feed_only"
+  ).length;
 }

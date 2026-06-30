@@ -94,7 +94,12 @@ export class RunService {
 
   async stop() {
     this.stopping = true;
-    await Promise.allSettled(this.generationJobPromises.values());
+    // 仅在 test/Vitest 环境下等待 audience generation job 完成,避免生产 shutdown
+    // 被真实 provider / 大观众数下的长任务阻塞;stopping 标志已阻止新 job 启动,
+    // process 退出时会强制终止仍在跑的 job。
+    if (process.env.NODE_ENV === "test" || process.env.VITEST === "true") {
+      await Promise.allSettled(this.generationJobPromises.values());
+    }
   }
 
   async createRun(input: CreateRunRequest) {

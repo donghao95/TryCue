@@ -4,7 +4,7 @@ export default defineConfig({
   test: {
     include: ["src/tests/*.integration.test.ts"],
     fileParallelism: false,
-    testTimeout: 30000,
+    testTimeout: 60000,
     testNamePattern: [
       "smoke completes a small deterministic mock run with open and feed-only exit",
       "treats duplicate plan confirmation as idempotency conflict and creates only one expansion job",

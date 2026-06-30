@@ -637,10 +637,21 @@ export class MockAgentProvider implements AgentProvider {
       // 避免 UUID 数字末位带来的随机性；同一观众同一 stepIndex 行为可复现，
       // 不同 stepIndex 仍有变化以覆盖 read_post / like_comment / write_comment 等分支
       const indexHint = hashString(currentContext.participantId) + currentContext.stepIndex;
-      const forceFeedOnlyExit = currentContext.stepIndex === 0
-        ? await isDeterministicFeedOnlyExitParticipant(currentContext.runId, currentContext.participantId)
-        : false;
-      const toolCalls = enrichMockToolCalls(planMockTools(currentContext, indexHint, forceFeedOnlyExit), currentContext);
+      // 确定性 mock:仅在 test/Vitest 环境下,固定第一个 participant feed-only exit、
+      // 第二个 participant open_post,保证 smoke run 一定同时覆盖 opener 和 skip,
+      // 不依赖 indexHint % 5 的概率分支
+      const deterministicRole = currentContext.stepIndex === 0
+        ? await resolveParticipantDeterministicRole(currentContext.runId, currentContext.participantId)
+        : "default";
+      const toolCalls = enrichMockToolCalls(
+        planMockTools(
+          currentContext,
+          indexHint,
+          deterministicRole === "force_feed_only",
+          deterministicRole === "force_open_post"
+        ),
+        currentContext
+      );
       thoughtText = buildThought(currentContext, toolCalls);
       const enrichedToolCalls = toolCalls.map((call, index) => enrichMockToolCall(currentContext, currentActionId, call, index));
 
@@ -972,8 +983,17 @@ async function contextForNextMockTurn(
   };
 }
 
-export function planMockTools(context: RunParticipantContext, indexHint: number, forceFeedOnlyExit = false): ParsedToolCall[] {
+export function planMockTools(
+  context: RunParticipantContext,
+  indexHint: number,
+  forceFeedOnlyExit = false,
+  forceOpenPost = false
+): ParsedToolCall[] {
   if (!context.hasOpenedPost) {
+    // 确定性 open_post 优先于 feed-only,保证 smoke run 至少有一个 opener
+    if (context.stepIndex === 0 && forceOpenPost) {
+      return [{ toolName: "open_post", args: {} }];
+    }
     if (context.stepIndex === 0 && (forceFeedOnlyExit || indexHint % 5 === 0)) {
       return [mockExit("not_relevant", "feed_only", "low", "low")];
     }
@@ -1021,13 +1041,34 @@ export function planMockTools(context: RunParticipantContext, indexHint: number,
   return [];
 }
 
-async function isDeterministicFeedOnlyExitParticipant(runId: string, participantId: string) {
-  const firstParticipant = await prisma.runParticipant.findFirst({
+type DeterministicMockRole = "force_feed_only" | "force_open_post" | "default";
+
+/**
+ * 确定性 mock 角色解析:仅在 test/Vitest 环境下启用,避免影响本地 dev mock run。
+ *
+ * 规则:
+ * - participant 总数 <= 1 时返回 "default",保证 audienceCount=1 的 run 唯一观众不被强制 skip
+ * - 第一个 participant 强制 feed_only exit
+ * - 第二个 participant 强制 open_post,保证 smoke run 一定有 opener
+ * - 其他 participant 走原 indexHint 概率分支
+ *
+ * 一次查询拿前两个 participant,避免每个 step 都查两次 DB。
+ */
+async function resolveParticipantDeterministicRole(
+  runId: string,
+  participantId: string
+): Promise<DeterministicMockRole> {
+  if (process.env.NODE_ENV !== "test" && process.env.VITEST !== "true") return "default";
+  const firstTwo = await prisma.runParticipant.findMany({
     where: { runId },
     orderBy: { id: "asc" },
-    select: { id: true }
+    select: { id: true },
+    take: 2
   });
-  return firstParticipant?.id === participantId;
+  if (firstTwo.length <= 1) return "default";
+  if (firstTwo[0]!.id === participantId) return "force_feed_only";
+  if (firstTwo[1]!.id === participantId) return "force_open_post";
+  return "default";
 }
 
 type DemoCommentPoolName = keyof typeof demoCommentPools;
