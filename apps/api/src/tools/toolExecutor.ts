@@ -15,7 +15,8 @@ import {
   type ExitReadingDepth,
   type InterestTrustLevel,
   type ReadDepth,
-  type ToolName
+  type ToolName,
+  toolInputJsonSchema
 } from "@trycue/shared/tool";
 import type { LiveEventEnvelope } from "@trycue/shared/live-events";
 import { jsonSchema, tool, type StepResult, type Tool, type ToolSet } from "ai";
@@ -173,6 +174,15 @@ export function createAiSdkToolRuntimeContext(input: {
   return ctx;
 }
 
+/**
+ * Wrap shared Zod-derived JSON Schema into AI SDK jsonSchema().
+ * Stage 12: shared/tool.ts is the single source of truth for tool input schemas;
+ * toolExecutor no longer hand-writes inline JSON Schema objects.
+ */
+function sharedToolInputSchema(name: ToolName): ReturnType<typeof jsonSchema> {
+  return jsonSchema(toolInputJsonSchema(name) as never);
+}
+
 export function createAiSdkToolSet(ctx: AiSdkToolRuntimeContext): ToolSet {
   const executeTool = async (
     toolName: ToolName,
@@ -200,7 +210,7 @@ export function createAiSdkToolSet(ctx: AiSdkToolRuntimeContext): ToolSet {
   return {
     open_post: tool({
       description: "点开当前信息流帖子。适用于标题、封面、作者或首屏信息让你产生了继续看的兴趣。点开代表你愿意花更多时间了解详情，但不代表认可内容。点开后返回当前帖子的完整可观察信息和 postId。",
-      inputSchema: jsonSchema({ type: "object", properties: {}, additionalProperties: false }),
+      inputSchema: sharedToolInputSchema("open_post"),
       onInputAvailable: async ({ toolCallId }) => register("open_post", {}, toolCallId),
       execute: async (_args, { toolCallId }) => executeTool("open_post", {}, toolCallId, (txCtx) =>
         commitOpenPost(txCtx.tx, txCtx.action, txCtx.journey, txCtx.audience, txCtx.toolCall, txCtx.simulatedTime)
@@ -216,16 +226,7 @@ export function createAiSdkToolSet(ctx: AiSdkToolRuntimeContext): ToolSet {
     }),
     read_post: runtimeTool({
       description: "阅读当前帖子正文。适用于你想继续看内容，但还没有明确点赞、收藏、评论或分享冲动的时候。depth 表示阅读深度：skim 快速扫几眼，partial 认真看了一部分，full 基本看完。focus 可以填写你这次主要关注的关键词（例如价格、材料、步骤、风险、证据），最多 3 个，不要编造正文里没有的信息。这是“看了但不互动”的中间状态，不改变任何计数。",
-      inputSchema: jsonSchema({
-        type: "object",
-        properties: {
-          postId: { type: "string" },
-          depth: { type: "string", enum: ["skim", "partial", "full"] },
-          focus: { type: "array", items: { type: "string" }, maxItems: 3 }
-        },
-        required: ["postId", "depth"],
-        additionalProperties: false
-      }),
+      inputSchema: sharedToolInputSchema("read_post"),
       onInputAvailable: async ({ input, toolCallId }) => register("read_post", objectRecord(input), toolCallId),
       execute: async (args, { toolCallId }) => executeTool("read_post", objectRecord(args), toolCallId, (txCtx, input) =>
         commitReadPost(txCtx.tx, txCtx.action, txCtx.journey, txCtx.audience, txCtx.toolCall, input, txCtx.simulatedTime)
@@ -233,16 +234,7 @@ export function createAiSdkToolSet(ctx: AiSdkToolRuntimeContext): ToolSet {
     }),
     view_comments: runtimeTool({
       description: "查看或继续翻页评论区。适用于你想验证内容真实性、寻找其他人的补充经验、看看有没有争议、反例或更多细节。不是每次打开帖子都必须看评论。必须传入 open_post 返回的 postId。可选传入 sort（latest 或 hot，默认 latest）和 cursor（翻页用）。",
-      inputSchema: jsonSchema({
-        type: "object",
-        properties: {
-          postId: { type: "string" },
-          cursor: { type: "string" },
-          sort: { type: "string", enum: ["latest", "hot"] }
-        },
-        required: ["postId"],
-        additionalProperties: false
-      }),
+      inputSchema: sharedToolInputSchema("view_comments"),
       onInputAvailable: async ({ input, toolCallId }) => register("view_comments", objectRecord(input), toolCallId),
       execute: async (args, { toolCallId }) => executeTool("view_comments", objectRecord(args), toolCallId, (txCtx, input) =>
         commitViewComments(txCtx.tx, txCtx.action, txCtx.journey, txCtx.audience, txCtx.toolCall, input, txCtx.simulatedTime)
@@ -259,17 +251,7 @@ export function createAiSdkToolSet(ctx: AiSdkToolRuntimeContext): ToolSet {
     ),
     write_comment: runtimeTool({
       description: "发表评论或回复评论。只有当你有明确表达冲动时使用，例如提问、质疑、补充经验、表达共鸣、调侃、反驳。评论内容按你的 persona 和平台表达习惯自然生成，不要写成评审报告、总结或建议书。intent 标记你的评论意图：ask 提问、doubt 质疑、share_experience 补充个人经验、agree 认同/共鸣、joke 梗/调侃、pushback 反驳/不同意。必须传入 postId 和 intent；回复某条评论时额外传 replyToCommentId。",
-      inputSchema: jsonSchema({
-        type: "object",
-        properties: {
-          postId: { type: "string" },
-          intent: { type: "string", enum: ["ask", "doubt", "share_experience", "agree", "joke", "pushback"] },
-          content: { type: "string" },
-          replyToCommentId: { type: "string" }
-        },
-        required: ["postId", "intent", "content"],
-        additionalProperties: false
-      }),
+      inputSchema: sharedToolInputSchema("write_comment"),
       onInputAvailable: async ({ input, toolCallId }) => register("write_comment", objectRecord(input), toolCallId),
       execute: async (args, { toolCallId }) => executeTool("write_comment", objectRecord(args), toolCallId, (txCtx, input) =>
         commitWriteComment(txCtx.tx, txCtx.action, txCtx.journey, txCtx.audience, txCtx.toolCall, input, txCtx.simulatedTime)
@@ -277,12 +259,7 @@ export function createAiSdkToolSet(ctx: AiSdkToolRuntimeContext): ToolSet {
     }),
     like_comment: runtimeTool({
       description: "点赞一条你已经看到的评论。适用于这条评论说出了你的想法、提供了有用补充，或你认同它的质疑、经验或玩笑。只能点赞你已经通过 view_comments 看过的评论，不能凭空点赞。必须传入 commentId。",
-      inputSchema: jsonSchema({
-        type: "object",
-        properties: { commentId: { type: "string" } },
-        required: ["commentId"],
-        additionalProperties: false
-      }),
+      inputSchema: sharedToolInputSchema("like_comment"),
       onInputAvailable: async ({ input, toolCallId }) => register("like_comment", objectRecord(input), toolCallId),
       execute: async (args, { toolCallId }) => executeTool("like_comment", objectRecord(args), toolCallId, (txCtx, input) =>
         commitLikeComment(txCtx.tx, txCtx.action, txCtx.journey, txCtx.audience, txCtx.toolCall, input, txCtx.simulatedTime)
@@ -290,17 +267,7 @@ export function createAiSdkToolSet(ctx: AiSdkToolRuntimeContext): ToolSet {
     }),
     exit_browsing: runtimeTool({
       description: "结束本次浏览。适用于你没有继续阅读、互动或停留的动机时。这是关键证据工具，离开时需要记录原因分类 reasonCategory、阅读深度 readingDepth、兴趣水平 interestLevel 和信任水平 trustLevel，代表真实用户划走、关闭或结束浏览。reasonCategory：not_relevant 与我无关、not_interested 不感兴趣、low_trust 信任不足、too_ad_like 广告感太强、content_too_long 内容太长、need_more_evidence 需要更多证据、finished_normally 正常看完离开、no_more_action 没有更多动作。readingDepth：feed_only 只看了信息流卡片、skimmed 快速扫读、partial 看了一部分、full 基本看完。",
-      inputSchema: jsonSchema({
-        type: "object",
-        properties: {
-          reasonCategory: { type: "string", enum: ["not_relevant", "not_interested", "low_trust", "too_ad_like", "content_too_long", "need_more_evidence", "finished_normally", "no_more_action"] },
-          readingDepth: { type: "string", enum: ["feed_only", "skimmed", "partial", "full"] },
-          interestLevel: { type: "string", enum: ["low", "medium", "high"] },
-          trustLevel: { type: "string", enum: ["low", "medium", "high"] }
-        },
-        required: ["reasonCategory", "readingDepth", "interestLevel", "trustLevel"],
-        additionalProperties: false
-      }),
+      inputSchema: sharedToolInputSchema("exit_browsing"),
       onInputAvailable: async ({ input, toolCallId }) => register("exit_browsing", objectRecord(input), toolCallId),
       execute: async (args, { toolCallId }) => executeTool("exit_browsing", objectRecord(args), toolCallId, (txCtx, input) =>
         commitExitBrowsing(txCtx.tx, txCtx.action, txCtx.journey, txCtx.audience, txCtx.toolCall, input, txCtx.simulatedTime)
@@ -315,12 +282,7 @@ export function createAiSdkToolSet(ctx: AiSdkToolRuntimeContext): ToolSet {
   ) {
     return runtimeTool({
       description,
-      inputSchema: jsonSchema({
-        type: "object",
-        properties: { postId: { type: "string" } },
-        required: ["postId"],
-        additionalProperties: false
-      }),
+      inputSchema: sharedToolInputSchema(toolName),
       onInputAvailable: async ({ input, toolCallId }) => register(toolName, objectRecord(input), toolCallId),
       execute: async (args, { toolCallId }) => executeTool(toolName, objectRecord(args), toolCallId, (txCtx) => business(txCtx))
     });

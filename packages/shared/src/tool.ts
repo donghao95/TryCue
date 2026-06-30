@@ -1,4 +1,4 @@
-import { z } from "zod";
+import { z, toJSONSchema } from "zod";
 
 // ── 工具名 ──
 
@@ -112,4 +112,38 @@ export function categoryForTool(toolName: ToolName): ToolCategory {
   return toolName === "like_post" || toolName === "favorite_post" || toolName === "share_post" || toolName === "write_comment" || toolName === "like_comment"
     ? "interaction"
     : "navigation";
+}
+
+// ── 工具 input JSON schema 派生 ──
+//
+// 阶段12 spike 决策：shared Zod schema 是工具参数契约的唯一事实源。
+// toolExecutor 通过 toolInputJsonSchema() 派生 AI SDK jsonSchema()，
+// 不再手写内联 JSON Schema，消除"模型看到的 schema"与"shared 定义"的漂移。
+// 运行时参数校验仍由 toolExecutor 的 *Arg helper 负责（保留 snake_case 兼容）。
+
+/** open_post 无参数，但需要显式 strict 空对象以保证 additionalProperties: false。 */
+const OpenPostArgsSchema = z.object({}).strict();
+
+const TOOL_ARGS_SCHEMAS: Record<ToolName, z.ZodType> = {
+  open_post: OpenPostArgsSchema,
+  read_post: ReadPostArgsSchema,
+  view_comments: ViewCommentsArgsSchema,
+  like_post: PostIdArgsSchema,
+  favorite_post: PostIdArgsSchema,
+  share_post: PostIdArgsSchema,
+  write_comment: WriteCommentArgsSchema,
+  like_comment: LikeCommentArgsSchema,
+  exit_browsing: ExitBrowsingArgsSchema
+};
+
+/**
+ * 从 shared Zod schema 派生 AI SDK tool inputSchema。
+ * 去掉 Zod v4 toJSONSchema 默认输出的 $schema 元数据字段（部分 OpenAI 兼容 API 会拒绝）。
+ * 返回值可直接传入 AI SDK 的 jsonSchema()。
+ */
+export function toolInputJsonSchema(name: ToolName): Record<string, unknown> {
+  const schema = TOOL_ARGS_SCHEMAS[name];
+  const generated = toJSONSchema(schema) as Record<string, unknown>;
+  delete generated["$schema"];
+  return generated;
 }

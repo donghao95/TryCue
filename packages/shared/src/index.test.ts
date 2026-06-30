@@ -41,7 +41,9 @@ import {
   AudienceGroupStatsSchema,
   AudienceGroupAnalysisSchema,
   METRIC_DICTIONARY,
-  getMetricEntry
+  getMetricEntry,
+  toolInputJsonSchema,
+  MAX_COMMENT_LENGTH
 } from "./index.js";
 
 describe("shared contracts", () => {
@@ -900,5 +902,105 @@ describe("report decision dashboard schemas", () => {
       ...baseValid,
       confidence: "critical"
     }).success).toBe(false);
+  });
+});
+
+describe("toolInputJsonSchema", () => {
+  // Stage 12: shared Zod schema is the single source of truth for AI SDK tool
+  // inputSchema. These tests lock the generated JSON Schema shape so that
+  // changes to Zod schemas or Zod version upgrades are caught here.
+
+  it("does not include the $schema metadata field for any tool", () => {
+    const names = [
+      "open_post", "read_post", "view_comments", "like_post", "favorite_post",
+      "share_post", "write_comment", "like_comment", "exit_browsing"
+    ] as const;
+    for (const name of names) {
+      const schema = toolInputJsonSchema(name);
+      expect(schema).not.toHaveProperty("$schema");
+    }
+  });
+
+  it("generates additionalProperties: false for all tools", () => {
+    const names = [
+      "open_post", "read_post", "view_comments", "like_post", "favorite_post",
+      "share_post", "write_comment", "like_comment", "exit_browsing"
+    ] as const;
+    for (const name of names) {
+      const schema = toolInputJsonSchema(name);
+      expect(schema.additionalProperties).toBe(false);
+    }
+  });
+
+  it("generates correct required arrays", () => {
+    expect(toolInputJsonSchema("open_post").required ?? []).toEqual([]);
+    expect(toolInputJsonSchema("read_post").required).toEqual(["postId", "depth"]);
+    expect(toolInputJsonSchema("view_comments").required).toEqual(["postId"]);
+    expect(toolInputJsonSchema("like_post").required).toEqual(["postId"]);
+    expect(toolInputJsonSchema("write_comment").required).toEqual(["postId", "intent", "content"]);
+    expect(toolInputJsonSchema("like_comment").required).toEqual(["commentId"]);
+    expect(toolInputJsonSchema("exit_browsing").required).toEqual([
+      "reasonCategory", "readingDepth", "interestLevel", "trustLevel"
+    ]);
+  });
+
+  it("includes enum constraints for write_comment.intent", () => {
+    const intentSchema = (toolInputJsonSchema("write_comment").properties as Record<string, Record<string, unknown>>).intent!;
+    expect(intentSchema.enum).toEqual(["ask", "doubt", "share_experience", "agree", "joke", "pushback"]);
+  });
+
+  it("includes maxLength constraint for write_comment.content matching MAX_COMMENT_LENGTH", () => {
+    const contentSchema = (toolInputJsonSchema("write_comment").properties as Record<string, Record<string, unknown>>).content!;
+    expect(contentSchema.maxLength).toBe(MAX_COMMENT_LENGTH);
+    expect(contentSchema.minLength).toBe(1);
+  });
+
+  it("includes minLength constraint for postId fields", () => {
+    const writeCommentProps = toolInputJsonSchema("write_comment").properties as Record<string, Record<string, unknown>>;
+    expect(writeCommentProps.postId!.minLength).toBe(1);
+  });
+
+  it("includes enum constraints for exit_browsing fields", () => {
+    const props = toolInputJsonSchema("exit_browsing").properties as Record<string, Record<string, unknown>>;
+    expect(props.reasonCategory!.enum).toEqual([
+      "not_relevant", "not_interested", "low_trust", "too_ad_like",
+      "content_too_long", "need_more_evidence", "finished_normally", "no_more_action"
+    ]);
+    expect(props.readingDepth!.enum).toEqual(["feed_only", "skimmed", "partial", "full"]);
+    expect(props.interestLevel!.enum).toEqual(["low", "medium", "high"]);
+    expect(props.trustLevel!.enum).toEqual(["low", "medium", "high"]);
+  });
+
+  it("declares nullable replyToCommentId via anyOf for write_comment", () => {
+    const props = toolInputJsonSchema("write_comment").properties as Record<string, Record<string, unknown>>;
+    // Zod v4 emits anyOf: [{type:"string"}, {type:"null"}] for nullable fields.
+    // This tells the model that null is a valid value for replyToCommentId.
+    expect(props.replyToCommentId!.anyOf).toEqual([
+      { type: "string" },
+      { type: "null" }
+    ]);
+  });
+
+  it("includes maxItems: 3 and item maxLength for read_post.focus", () => {
+    const props = toolInputJsonSchema("read_post").properties as Record<string, Record<string, unknown>>;
+    expect(props.focus!.maxItems).toBe(3);
+    expect((props.focus!.items as Record<string, unknown>).maxLength).toBe(20);
+    expect((props.focus!.items as Record<string, unknown>).minLength).toBe(1);
+  });
+
+  it("includes enum for read_post.depth", () => {
+    const props = toolInputJsonSchema("read_post").properties as Record<string, Record<string, unknown>>;
+    expect(props.depth!.enum).toEqual(["skim", "partial", "full"]);
+  });
+
+  it("declares nullable cursor and sort with enum for view_comments", () => {
+    const props = toolInputJsonSchema("view_comments").properties as Record<string, Record<string, unknown>>;
+    // cursor: nullable string (optional in Zod, emitted as anyOf string|null)
+    expect(props.cursor!.anyOf).toEqual([{ type: "string" }, { type: "null" }]);
+    // sort: nullable enum (optional in Zod, emitted as anyOf [{enum}, null])
+    expect(props.sort!.anyOf).toEqual([
+      { type: "string", enum: ["latest", "hot"] },
+      { type: "null" }
+    ]);
   });
 });
