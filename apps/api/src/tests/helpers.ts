@@ -156,7 +156,7 @@ export async function cleanupIntegrationTest() {
   await rm(integrationLlmConfigPath, { force: true });
 }
 
-async function prepareAudienceReady(app: FastifyInstance, runId: string) {
+export async function prepareAudienceReady(app: FastifyInstance, runId: string) {
   const planJob = await app.inject({
     method: "POST",
     url: `/api/runs/${runId}/audience-sampling-plan`,
@@ -187,9 +187,8 @@ async function prepareAudienceReady(app: FastifyInstance, runId: string) {
     return !activeJob && totalCount > 0 && readyCount === totalCount && plan?.status === "ready";
   });
 }
-export { prepareAudienceReady };
 
-async function createSmallAudienceReadyRun(audienceCount: number) {
+export async function createSmallAudienceReadyRun(audienceCount: number) {
   const run = await prisma.testRun.create({
     data: {
       status: "audience_ready",
@@ -268,9 +267,8 @@ async function createSmallAudienceReadyRun(audienceCount: number) {
   await prisma.simulatedPostState.create({ data: { contentVersionId: content.id } });
   return run.id;
 }
-export { createSmallAudienceReadyRun };
 
-async function waitFor(predicate: () => Promise<boolean>, options: { timeoutMs?: number; describe?: () => Promise<string> } = {}) {
+export async function waitFor(predicate: () => Promise<boolean>, options: { timeoutMs?: number; describe?: () => Promise<string> } = {}) {
   const deadline = Date.now() + (options.timeoutMs ?? 25_000);
   while (Date.now() < deadline) {
     if (await predicate()) return;
@@ -279,9 +277,8 @@ async function waitFor(predicate: () => Promise<boolean>, options: { timeoutMs?:
   const detail = options.describe ? ` ${await options.describe()}` : "";
   throw new Error(`Timed out waiting for condition.${detail}`);
 }
-export { waitFor };
 
-async function describeRunProgress(runId: string) {
+export async function describeRunProgress(runId: string) {
   const [run, participants, journeys, turns, reportCount] = await Promise.all([
     prisma.testRun.findUnique({ where: { id: runId } }),
     prisma.runParticipant.groupBy({ by: ["runtimeStatus"], where: { runId }, _count: true }),
@@ -299,7 +296,6 @@ async function describeRunProgress(runId: string) {
     reportCount
   });
 }
-export { describeRunProgress };
 
 /**
  * 统计 run 内 readingDepth=feed_only 的 exit_browsing tool call 数量。
@@ -308,7 +304,7 @@ export { describeRunProgress };
  * 因为 SQLite 下 Prisma 对 JSON path 的支持依赖 json_extract(),行为与 PostgreSQL 不一致,
  * 对类型 coercion 和 nested path 有已知问题。改为先查 tool calls 再在 JS 里过滤,跨库一致。
  */
-async function countFeedOnlyExitBrowsingCalls(runId: string) {
+export async function countFeedOnlyExitBrowsingCalls(runId: string) {
   const exitBrowsingCalls = await prisma.agentToolCall.findMany({
     where: { runId, toolName: "exit_browsing" },
     select: { input: true }
@@ -317,4 +313,3 @@ async function countFeedOnlyExitBrowsingCalls(runId: string) {
     (call) => (call.input as { readingDepth?: string } | null)?.readingDepth === "feed_only"
   ).length;
 }
-export { countFeedOnlyExitBrowsingCalls };
