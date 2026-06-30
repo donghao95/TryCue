@@ -45,7 +45,13 @@ export function useReportEvents(params: UseReportEventsParams): void {
 
   useEffect(() => {
     if (!runId) return;
-    const sseUrl = `/api/runs/${runId}/events`;
+    // `liveOnly=true` skips historical replay: the report page already loads
+    // the latest report via REST on mount (`loadReport`), so we only need
+    // regenerations that happen *after* the SSE connection is established.
+    // Without this the server would replay every historical durable event
+    // for the run, causing a redundant `loadReport` if any past
+    // `report.regenerated` event is in the history.
+    const sseUrl = `/api/runs/${runId}/events?liveOnly=true`;
     const source = new EventSource(sseUrl);
 
     source.addEventListener("report.regenerated", (event) => {

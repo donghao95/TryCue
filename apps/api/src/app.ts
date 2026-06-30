@@ -363,7 +363,14 @@ export async function buildApp(config: AppConfig) {
       return reply.status(404).send(fail("RUN_NOT_FOUND", "试映任务不存在"));
     }
     const lastEventId = request.headers["last-event-id"];
-    const queryAfter = (request.query as { after?: unknown }).after;
+    const query = request.query as { after?: unknown; liveOnly?: unknown };
+    const queryAfter = query.after;
+    // `liveOnly=true` skips historical replay entirely — only events produced
+    // after the connection is established are pushed. Used by subscribers that
+    // only need real-time updates (e.g. the report page's `useReportEvents`
+    // hook, which loads current state via REST on mount and only cares about
+    // future regenerations). Takes precedence over `after` / `Last-Event-ID`.
+    const liveOnly = typeof query.liveOnly === "string" && query.liveOnly === "true";
     const afterSequence = Array.isArray(lastEventId)
       ? lastEventId[0] || (typeof queryAfter === "string" ? queryAfter : undefined)
       : lastEventId || (typeof queryAfter === "string" ? queryAfter : undefined);
@@ -373,8 +380,10 @@ export async function buildApp(config: AppConfig) {
       Connection: "keep-alive",
       "X-Accel-Buffering": "no"
     });
-    for (const event of await listLiveEvents(runId, afterSequence)) {
-      reply.raw.write(encodeSse(event));
+    if (!liveOnly) {
+      for (const event of await listLiveEvents(runId, afterSequence)) {
+        reply.raw.write(encodeSse(event));
+      }
     }
     let destroyed = false;
     const safeWrite = (data: string) => {

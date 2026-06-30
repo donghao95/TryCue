@@ -1068,10 +1068,14 @@ Last-Event-ID: 42          # 可选，live_events.sequence 字符串
 ```
 
 ```text
-GET /api/runs/:runId/events?after=42   # 可选，query 参数，live_events.sequence 字符串
+GET /api/runs/:runId/events?after=42        # 可选，query 参数，live_events.sequence 字符串
+GET /api/runs/:runId/events?liveOnly=true   # 可选，跳过历史重放，只推送连接建立后的新事件
 ```
 
-优先级：`Last-Event-ID` header > `after` query 参数 > undefined（从头推送）。`after` 参数供前端首次连接时传入 `GET /api/runs/:runId` 返回的 `latestLiveEventSequence`，避免重放全部历史事件。
+优先级：`liveOnly` > `Last-Event-ID` header > `after` query 参数 > undefined（从头推送）。
+
+- `after` 参数供前端首次连接时传入 `GET /api/runs/:runId` 返回的 `latestLiveEventSequence`，避免重放全部历史事件。
+- `liveOnly=true` 完全跳过历史重放，只推送连接建立后产生的新事件。用于只关心实时更新、不关心历史的订阅者（例如报告页 `useReportEvents` hook：报告数据在挂载时通过 REST 拉取，只需订阅后续的 `report.regenerated` 事件）。当 `liveOnly=true` 时，`after` 和 `Last-Event-ID` 被忽略。
 
 #### 响应 Header
 
