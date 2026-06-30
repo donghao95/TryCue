@@ -88,6 +88,14 @@ ToolCallInputSchema
 
 后端不得直接信任 `request.body as SomeType`；必须先用 shared schema 校验，再进入 service。
 
+**工具 input schema 事实源（阶段12 决策）：**
+
+- `packages/shared/src/tool.ts` 中的 Zod schema（`WriteCommentArgsSchema`、`ReadPostArgsSchema` 等）是工具参数契约的**唯一事实源**。
+- `toolInputJsonSchema(name: ToolName)` 从 Zod schema 派生 AI SDK `jsonSchema()`，toolExecutor 不再手写内联 JSON Schema。
+- 运行时参数校验仍由 toolExecutor 的 `*Arg` helper 负责（保留 snake_case 兼容），不依赖 Zod safeParse。
+- 模型看到的 schema 比 v1 之前更严格：包含 `minLength`、`maxLength`、`enum`、nullable 字段的 `anyOf` 声明。
+- `$schema` 元数据字段在派生时被移除（部分 OpenAI 兼容 API 会拒绝）。
+
 **Response DTO / View Model：**
 
 ```text
