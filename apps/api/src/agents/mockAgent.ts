@@ -996,7 +996,12 @@ export function planMockTools(
     if (role === "feed_only" && context.stepIndex === 0) {
       return [mockExit("not_relevant", "feed_only", "low", "low")];
     }
-    // solo / opener / default:open_post
+    // default 角色(第 6+ participant):保留原 indexHint % 5 === 0 的 pre-open skip,
+    // 维持 smoke 之外的 mock 行为多样性;前 5 个固定角色不受影响
+    if (role === "default" && context.stepIndex === 0 && indexHint % 5 === 0) {
+      return [mockExit("not_relevant", "feed_only", "low", "low")];
+    }
+    // solo / opener / default(non-skip):open_post
     return [{ toolName: "open_post", args: {} }];
   }
 
