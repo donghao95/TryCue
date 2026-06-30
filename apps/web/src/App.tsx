@@ -2840,6 +2840,14 @@ export function App() {
       setUiStatus("completed");
       void refreshSnapshots(runId, { strict: true });
     }
+    if (event.type === "report.regenerated") {
+      // Report was regenerated (e.g. by another session or a background job).
+      // Reload the report so the UI reflects the latest version. The
+      // `regenerateReport` action also updates local state synchronously, but
+      // this SSE handler covers cross-session updates and any future server-side
+      // regeneration paths.
+      void loadReport(eventRunId);
+    }
 
     // Compile-time exhaustiveness check — see assertLiveEventTypeExhaustive.
     assertLiveEventTypeExhaustive(event.type);
