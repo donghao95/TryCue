@@ -71,6 +71,7 @@ import { AppHeader } from "./components/AppHeader.js";
 import { AnimatedCommentList, AudienceAvatar, PostAction, SeatCell, VenueHud } from "./components/VenueWidgets.js";
 import { useNavigationGuard } from "./hooks/useNavigationGuard.js";
 import { useLiveEvents, type ConnectionStatus } from "./hooks/useLiveEvents.js";
+import { useReportEvents } from "./hooks/useReportEvents.js";
 import { useCreateDraft, isMeaningfulCreateDraft } from "./hooks/useCreateDraft.js";
 import i18n from "./i18n.js";
 import {
@@ -950,6 +951,16 @@ export function App() {
     latestLiveEventSequenceRef,
     onEvent: handleLiveEvent,
     onConnectionStatusChange: setConnectionStatus,
+    onMalformed: () => showAppError(t("audienceGen.toast.sseError"))
+  });
+
+  // Report page SSE: only listens for `report.regenerated` so a viewer on
+  // `/reports/:runId` picks up regenerations triggered by another session or
+  // a server-side job. `useLiveEvents` is gated off on the report route, so
+  // this dedicated hook is the only SSE connection on that page.
+  useReportEvents({
+    runId: route.kind === "report" ? route.runId : "",
+    onReportRegenerated: () => void loadReport(route.kind === "report" ? route.runId : ""),
     onMalformed: () => showAppError(t("audienceGen.toast.sseError"))
   });
 
