@@ -14,13 +14,28 @@ export function getRunId(params: unknown): string {
 
 /**
  * Parse pagination query params (`limit`, `cursor`) with clamping.
- * Mirrors the original inline helper in app.ts.
+ *
+ * Guards against non-numeric / NaN / non-finite inputs by falling back to
+ * defaults, and clamps to safe ranges. `limit` is clamped to [1, 100], cursor
+ * to [0, MAX_SAFE_INTEGER]. Both are truncated to integers.
  */
 export function parsePageQuery(query: unknown, defaultLimit = 10) {
   const value = query as { limit?: string; cursor?: string };
-  const limit = Math.min(value.limit != null ? Number(value.limit) : defaultLimit, 100);
-  const cursor = Math.max(value.cursor != null ? Number(value.cursor) : 0, 0);
-  return { limit, cursor };
+  return {
+    limit: clampInt(value.limit, defaultLimit, 1, 100),
+    cursor: clampInt(value.cursor, 0, 0, Number.MAX_SAFE_INTEGER)
+  };
+}
+
+/**
+ * Coerce an unknown query value to a clamped integer.
+ * Falls back to `fallback` when the value is missing, non-numeric, NaN, or
+ * non-finite; otherwise truncates to an integer and clamps to `[min, max]`.
+ */
+function clampInt(value: unknown, fallback: number, min: number, max: number): number {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return fallback;
+  return Math.min(max, Math.max(min, Math.trunc(n)));
 }
 
 /**

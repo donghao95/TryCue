@@ -1068,10 +1068,15 @@ Last-Event-ID: 42          # 可选，live_events.sequence 字符串
 ```
 
 ```text
-GET /api/runs/:runId/events?after=42   # 可选，query 参数，live_events.sequence 字符串
+GET /api/runs/:runId/events?after=42        # 可选，query 参数，live_events.sequence 字符串
+GET /api/runs/:runId/events?liveOnly=true   # 可选，跳过"无游标时的初始历史重放"
 ```
 
-优先级：`Last-Event-ID` header > `after` query 参数 > undefined（从头推送）。`after` 参数供前端首次连接时传入 `GET /api/runs/:runId` 返回的 `latestLiveEventSequence`，避免重放全部历史事件。
+`Last-Event-ID` header 与 `after` query 任一存在时，按 `Last-Event-ID` > `after` > undefined 解析为游标 `afterSequence`，并 replay 该游标之后的所有持久化事件。
+
+`liveOnly=true` 仅在"无游标"（既没有 `Last-Event-ID` 也没有 `after`）时跳过初始历史重放，只推送连接建立后的新事件；用于只关心实时更新、不关心历史的订阅者（例如报告页 `useReportEvents` hook：报告数据在挂载时通过 REST 拉取，只需订阅后续的 `report.regenerated` 事件）。
+
+如果 `liveOnly=true` 同时带了游标（典型场景：浏览器 EventSource 断线重连时自动带上 `Last-Event-ID`），服务端**仍然会** replay 游标之后的持久化事件，以补偿断线期间丢失的事件。`liveOnly` 永远不会抑制游标驱动的 replay。
 
 #### 响应 Header
 

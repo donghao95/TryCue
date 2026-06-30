@@ -11,9 +11,17 @@ import type { AppRoute, UiStatus } from "../types.js";
 export type ConnectionStatus = "idle" | "connecting" | "connected" | "reconnecting" | "closed";
 
 /**
- * All SSE event types the workbench subscribes to. Kept in sync with
- * `assertLiveEventTypeExhaustive` in App.tsx — adding a new type there requires
- * adding it here (and vice versa).
+ * All SSE event types the workbench subscribes to.
+ *
+ * Intentionally only includes events that `handleLiveEvent` in App.tsx actually
+ * handles. Events marked "intentionally not handled in the UI" in
+ * `assertLiveEventTypeExhaustive` (e.g. `audience.plan.reasoning.delta`) are
+ * deliberately NOT subscribed here — subscribing would just add a no-op
+ * listener that drops the payload.
+ *
+ * When adding a new event type: add it to `LiveEventType`, handle it in
+ * `handleLiveEvent`, add it to `assertLiveEventTypeExhaustive`, and if it needs
+ * SSE delivery, add it here too.
  */
 const LIVE_EVENT_TYPES: readonly LiveEventType[] = [
   "post_state.updated",
@@ -52,7 +60,8 @@ const LIVE_EVENT_TYPES: readonly LiveEventType[] = [
   "run.paused",
   "run.resumed",
   "run_log.created",
-  "run.completed"
+  "run.completed",
+  "report.regenerated"
 ];
 
 export interface UseLiveEventsParams {

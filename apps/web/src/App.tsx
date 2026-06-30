@@ -71,6 +71,7 @@ import { AppHeader } from "./components/AppHeader.js";
 import { AnimatedCommentList, AudienceAvatar, PostAction, SeatCell, VenueHud } from "./components/VenueWidgets.js";
 import { useNavigationGuard } from "./hooks/useNavigationGuard.js";
 import { useLiveEvents, type ConnectionStatus } from "./hooks/useLiveEvents.js";
+import { useReportEvents } from "./hooks/useReportEvents.js";
 import { useCreateDraft, isMeaningfulCreateDraft } from "./hooks/useCreateDraft.js";
 import i18n from "./i18n.js";
 import {
@@ -953,6 +954,16 @@ export function App() {
     onMalformed: () => showAppError(t("audienceGen.toast.sseError"))
   });
 
+  // Report page SSE: only listens for `report.regenerated` so a viewer on
+  // `/reports/:runId` picks up regenerations triggered by another session or
+  // a server-side job. `useLiveEvents` is gated off on the report route, so
+  // this dedicated hook is the only SSE connection on that page.
+  useReportEvents({
+    runId: route.kind === "report" ? route.runId : "",
+    onReportRegenerated: () => void loadReport(route.kind === "report" ? route.runId : "", { preserveStatus: true }),
+    onMalformed: () => showAppError(t("audienceGen.toast.sseError"))
+  });
+
   useEffect(() => {
     activeRunIdRef.current = runId;
   }, [runId]);
@@ -1675,7 +1686,7 @@ export function App() {
     if (distanceToBottom < 120) loadMoreRuntimeLogs();
   }
 
-  async function loadReport(id = runId) {
+  async function loadReport(id = runId, options?: { preserveStatus?: boolean }) {
     if (!id) return;
     const response = await request<ReportView>(`/api/runs/${id}/report`);
     if (!response.success) {
@@ -1685,7 +1696,11 @@ export function App() {
       return;
     }
     setReport(response.data);
-    setUiStatus("completed");
+    // SSE-triggered reloads must not flip the UI to "completed": the
+    // regeneration path allows paused/completed runs to regenerate without
+    // touching run status (see apps/api/src/runtime/report.ts). Only the
+    // report-route entry point should transition to "completed".
+    if (!options?.preserveStatus) setUiStatus("completed");
   }
 
   async function regenerateReport() {
@@ -2839,6 +2854,16 @@ export function App() {
     if (event.type === "run.completed") {
       setUiStatus("completed");
       void refreshSnapshots(runId, { strict: true });
+    }
+    if (event.type === "report.regenerated") {
+      // Report was regenerated (e.g. by another session or a background job).
+      // Reload the report so the UI reflects the latest version. The
+      // `regenerateReport` action also updates local state synchronously, but
+      // this SSE handler covers cross-session updates and any future server-side
+      // regeneration paths.
+      // preserveStatus: the backend regeneration path does not touch run status
+      // (paused/completed stay as-is), so the UI must not flip to "completed".
+      void loadReport(eventRunId, { preserveStatus: true });
     }
 
     // Compile-time exhaustiveness check — see assertLiveEventTypeExhaustive.

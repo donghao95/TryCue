@@ -363,7 +363,19 @@ export async function buildApp(config: AppConfig) {
       return reply.status(404).send(fail("RUN_NOT_FOUND", "试映任务不存在"));
     }
     const lastEventId = request.headers["last-event-id"];
-    const queryAfter = (request.query as { after?: unknown }).after;
+    const query = request.query as { after?: unknown; liveOnly?: unknown };
+    const queryAfter = query.after;
+    // `liveOnly=true` skips the *initial* historical replay when no cursor is
+    // provided — used by subscribers that only need real-time updates (e.g. the
+    // report page's `useReportEvents` hook, which loads current state via REST
+    // on mount and only cares about future regenerations).
+    // However, on browser-driven reconnects EventSource re-sends `Last-Event-ID`,
+    // and the client may also pass `?after=`. In those cases we DO replay
+    // missed durable events from that cursor forward — otherwise events
+    // produced during the disconnect (e.g. a `report.regenerated`) would be
+    // permanently lost. So `liveOnly` only suppresses the no-cursor initial
+    // replay; it never suppresses cursor-driven replay.
+    const liveOnly = typeof query.liveOnly === "string" && query.liveOnly === "true";
     const afterSequence = Array.isArray(lastEventId)
       ? lastEventId[0] || (typeof queryAfter === "string" ? queryAfter : undefined)
       : lastEventId || (typeof queryAfter === "string" ? queryAfter : undefined);
@@ -373,8 +385,11 @@ export async function buildApp(config: AppConfig) {
       Connection: "keep-alive",
       "X-Accel-Buffering": "no"
     });
-    for (const event of await listLiveEvents(runId, afterSequence)) {
-      reply.raw.write(encodeSse(event));
+    const shouldReplay = !liveOnly || afterSequence !== undefined;
+    if (shouldReplay) {
+      for (const event of await listLiveEvents(runId, afterSequence)) {
+        reply.raw.write(encodeSse(event));
+      }
     }
     let destroyed = false;
     const safeWrite = (data: string) => {
