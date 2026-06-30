@@ -87,6 +87,7 @@ describe("audience sampling plan and identity flow", () => {
     expect(await prisma.runParticipant.count({ where: { runId } })).toBe(0);
     expect(await prisma.audienceGenerationJob.count({ where: { runId, scope: "sampling_plan", status: "completed", active: false } })).toBe(1);
 
+    await waitForLiveEvent(runId, "audience.plan.ready");
     const events = await prisma.liveEvent.findMany({ where: { runId }, orderBy: { sequence: "asc" } });
     expect(events.some((event) => event.eventType === "audience.plan.started")).toBe(true);
     expect(events.some((event) => event.eventType === "audience.plan.ready")).toBe(true);
@@ -794,6 +795,15 @@ async function waitForAudienceGeneration(app: FastifyInstance, runId: string, pr
     await new Promise((resolve) => setTimeout(resolve, 25));
   }
   throw new Error("audience generation did not reach expected state");
+}
+
+async function waitForLiveEvent(runId: string, eventType: string) {
+  for (let attempt = 0; attempt < 200; attempt += 1) {
+    const exists = await prisma.liveEvent.count({ where: { runId, eventType } });
+    if (exists > 0) return;
+    await new Promise((resolve) => setTimeout(resolve, 25));
+  }
+  throw new Error(`live event ${eventType} did not arrive`);
 }
 
 async function createServiceRun(status: "draft" | "planning_audience" | "generating_audience" | "audience_ready" | "report_generating" = "generating_audience") {

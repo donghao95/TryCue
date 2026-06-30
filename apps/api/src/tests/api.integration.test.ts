@@ -72,7 +72,7 @@ describe("TryCue API integration", () => {
     await waitFor(async () => {
       const run = await prisma.testRun.findUniqueOrThrow({ where: { id: runId } });
       return run.status === "completed";
-    });
+    }, { timeoutMs: 60_000, describe: () => describeRunProgress(runId) });
 
     expect(await prisma.runParticipant.count({ where: { runId } })).toBe(12);
     expect(await prisma.agentTurn.count({ where: { runId, status: "completed" } })).toBeGreaterThan(0);
@@ -146,8 +146,37 @@ describe("TryCue API integration", () => {
     // Some journeys should have opened the post (post phase), some should not (feed phase / skipped).
     expect(openPostCounts.some((c) => c > 0)).toBe(true);
     expect(openPostCounts.some((c) => c === 0)).toBe(true);
+    expect(await prisma.agentJourney.count({ where: { runId, exitOutcome: "skipped" } })).toBeGreaterThan(0);
+    expect(await countFeedOnlyExitBrowsingCalls(runId)).toBeGreaterThan(0);
     await app.close();
-  }, 30000);
+  }, 90_000);
+
+  it("smoke completes a small deterministic mock run with open and feed-only exit", async () => {
+    const app = await buildApp({ ...loadConfig(), appEnv: "test", llmConfigPath, enableScheduler: true, schedulerDefaultConcurrency: 1 });
+    const runId = await createSmallAudienceReadyRun(4);
+
+    const startResponse = await app.inject({ method: "POST", url: `/api/runs/${runId}/start`, payload: { force: false } });
+    expect(startResponse.statusCode).toBe(200);
+
+    await waitFor(async () => {
+      const run = await prisma.testRun.findUniqueOrThrow({ where: { id: runId } });
+      return run.status === "completed";
+    }, { timeoutMs: 60_000, describe: () => describeRunProgress(runId) });
+
+    expect(await prisma.runParticipant.count({ where: { runId } })).toBe(4);
+    const journeys = await prisma.agentJourney.findMany({ where: { runId } });
+    const openPostCounts = await Promise.all(
+      journeys.map((j) => prisma.socialInteractionEvent.count({
+        where: { journeyId: j.id, interactionType: "open_post" }
+      }))
+    );
+    expect(openPostCounts.some((count) => count > 0)).toBe(true);
+    expect(openPostCounts.some((count) => count === 0)).toBe(true);
+    expect(await prisma.agentJourney.count({ where: { runId, exitOutcome: "skipped" } })).toBeGreaterThan(0);
+    expect(await countFeedOnlyExitBrowsingCalls(runId)).toBeGreaterThan(0);
+
+    await app.close();
+  }, 90_000);
 
   it("paginates run logs with a stable newest-first cursor", async () => {
     const app = await buildApp({ ...loadConfig(), appEnv: "test", llmConfigPath, enableScheduler: false });
@@ -1522,7 +1551,7 @@ describe("TryCue API integration", () => {
     await waitFor(async () => {
       const run = await prisma.testRun.findUniqueOrThrow({ where: { id: runId } });
       return run.status === "completed";
-    });
+    }, { timeoutMs: 60_000, describe: () => describeRunProgress(runId) });
 
     // Confirm runtime data exists
     expect(await prisma.runParticipant.count({ where: { runId } })).toBeGreaterThan(0);
@@ -1579,7 +1608,7 @@ describe("TryCue API integration", () => {
     expect(run.errorMessage).toBeNull();
 
     await app.close();
-  }, 30000);
+  }, 90_000);
 
   it("resets runtime facts on a paused run created via createToolTestBundle", async () => {
     const bundle = await createToolTestBundle(true);
@@ -1689,11 +1718,128 @@ async function prepareAudienceReady(app: FastifyInstance, runId: string) {
   });
 }
 
-async function waitFor(predicate: () => Promise<boolean>) {
-  const deadline = Date.now() + 25_000;
+async function createSmallAudienceReadyRun(audienceCount: number) {
+  const run = await prisma.testRun.create({
+    data: {
+      status: "audience_ready",
+      audienceCount,
+      configJson: { scale: "custom", audienceCount },
+      contentVersionCount: 1
+    }
+  });
+  const content = await prisma.contentVersion.create({
+    data: {
+      runId: run.id,
+      title: "小规模 smoke 试映",
+      coverImageUrl: "/uploads/test.png",
+      imageUrlsJson: ["/uploads/test.png"],
+      bodyText: "这是一段用于 smoke 集成测试的正文，覆盖启动、打开帖子和信息流直接退出。",
+      scale: "custom"
+    }
+  });
+  const plan = await prisma.audienceSamplingPlan.create({
+    data: {
+      runId: run.id,
+      totalCount: audienceCount,
+      status: "ready",
+      confirmedAt: new Date(),
+      planMarkdown: "小规模 smoke 采样计划",
+      dimensionsJson: ["smoke"],
+      directives: {
+        create: [{
+          name: "smoke users",
+          description: "用于 smoke 的确定性观众",
+          quantity: audienceCount,
+          diversityAxesJson: ["smoke"],
+          rationale: "覆盖打开和跳过",
+          expansionStatus: "ready",
+          sortOrder: 0
+        }]
+      }
+    },
+    include: { directives: true }
+  });
+  const directive = plan.directives[0]!;
+  for (let index = 0; index < audienceCount; index += 1) {
+    const user = await prisma.user.create({ data: { userType: "agent", nickname: `Smoke 用户 ${index + 1}` } });
+    const personaJson = {
+      profile: `Smoke 用户 ${index + 1}，用于小规模集成测试。`,
+      personality: "谨慎务实",
+      mbtiType: "ISFJ",
+      responseStyle: "自然浏览并根据兴趣决定是否打开帖子。"
+    };
+    const agent = await prisma.agent.create({ data: { userId: user.id, personaJson } });
+    const platformAccount = await prisma.platformAccount.create({ data: { userId: user.id, platform: "xiaohongshu" } });
+    await prisma.audienceProfile.create({
+      data: {
+        runId: run.id,
+        samplingPlanId: plan.id,
+        samplingDirectiveId: directive.id,
+        sampleIndex: index,
+        sortOrder: index,
+        samplingLabel: `Smoke ${index + 1}`,
+        demographicsJson: {
+          gender: "不限定",
+          ageRange: "不限定",
+          cityTier: "不限定",
+          lifeStage: "不限定",
+          role: "smoke",
+          spendingPower: "不限定"
+        },
+        identityStatus: "identity_ready",
+        identityGeneratedAt: new Date(),
+        generatedUserId: user.id,
+        generatedAgentId: agent.id,
+        generatedPlatformAccountId: platformAccount.id
+      }
+    });
+  }
+  await prisma.simulatedPostState.create({ data: { contentVersionId: content.id } });
+  return run.id;
+}
+
+async function waitFor(predicate: () => Promise<boolean>, options: { timeoutMs?: number; describe?: () => Promise<string> } = {}) {
+  const deadline = Date.now() + (options.timeoutMs ?? 25_000);
   while (Date.now() < deadline) {
     if (await predicate()) return;
     await new Promise((resolve) => setTimeout(resolve, 100));
   }
-  throw new Error("Timed out waiting for condition.");
+  const detail = options.describe ? ` ${await options.describe()}` : "";
+  throw new Error(`Timed out waiting for condition.${detail}`);
+}
+
+async function describeRunProgress(runId: string) {
+  const [run, participants, journeys, turns, reportCount] = await Promise.all([
+    prisma.testRun.findUnique({ where: { id: runId } }),
+    prisma.runParticipant.groupBy({ by: ["runtimeStatus"], where: { runId }, _count: true }),
+    prisma.agentJourney.groupBy({ by: ["status", "runnerStatus"], where: { runId }, _count: true }),
+    prisma.agentTurn.groupBy({ by: ["status"], where: { runId }, _count: true }),
+    prisma.report.count({ where: { runId } })
+  ]);
+  return JSON.stringify({
+    runStatus: run?.status,
+    terminalReason: run?.terminalReason,
+    errorMessage: run?.errorMessage,
+    participants,
+    journeys,
+    turns,
+    reportCount
+  });
+}
+
+/**
+ * 统计 run 内 readingDepth=feed_only 的 exit_browsing tool call 数量。
+ *
+ * 不使用 Prisma JSON path filter (`input: { path: "$.readingDepth", equals: "feed_only" }`),
+ * 因为 SQLite 下 Prisma 对 JSON path 的支持依赖 json_extract(),行为与 PostgreSQL 不一致,
+ * 对类型 coercion 和 nested path 有已知问题。改为先查 tool calls 再在 JS 里过滤,跨库一致。
+ */
+async function countFeedOnlyExitBrowsingCalls(runId: string) {
+  const exitBrowsingCalls = await prisma.agentToolCall.findMany({
+    where: { runId, toolName: "exit_browsing" },
+    select: { input: true }
+  });
+  return exitBrowsingCalls.filter(
+    (call) => (call.input as { readingDepth?: string } | null)?.readingDepth === "feed_only"
+  ).length;
 }

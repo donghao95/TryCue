@@ -715,7 +715,7 @@ DELETE /api/runs/:runId/audience-sampling-plan/directives/:directiveId
 
 ### POST /api/runs/:runId/audience-sampling-plan/confirm
 
-确认 plan 并自动创建观众生成 pipeline job。后端在同一个 active audience generation job 内流式展开 profile slot，并在 profile 写库后并发生成人设；前端只观察进度。
+确认 plan 并自动创建观众生成 pipeline job。后端按 run 级串行化同一计划的确认请求；并发重复确认时，只允许第一个请求完成确认并创建 active audience generation job，后续请求会在看到已确认 plan 或 active job 后返回 409，不得返回 500 或创建重复 job。后端在同一个 active audience generation job 内流式展开 profile slot，并在 profile 写库后并发生成人设；前端只观察进度。
 
 Profile expansion 按 directive chunk 流式展开。默认 chunk size 为 10，真实 LLM 并发上限当前默认 3。每个 chunk 独立调用 Profile Expander，不向 provider 传入其他 chunks 或 directives 已生成的 `existingProfiles`；跨 directive 去重由采样计划本身和 directive 边界承担。Profile Expander 输出 NDJSON `profile_completed` frame；后端每解析出一个合法 profile 就创建 `AudienceProfile(profile_only)` 并推送前端。单个 directive 最终数量必须等于 `directive.quantity`；失败时标记该 directive failed，重试该 directive 会清理该 directive 下已有 profiles / identities 后重新展开整组。
 

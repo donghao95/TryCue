@@ -2,6 +2,9 @@ import { describe, expect, it } from "vitest";
 import { MockAgentProvider, planMockTools } from "./mockAgent.js";
 import type { RunParticipantContext } from "./types.js";
 
+// 确保测试不继承开发者本地设置的 MOCK_AGENT_DELAY_MS,避免测试被人为延迟拖慢
+delete process.env.MOCK_AGENT_DELAY_MS;
+
 const postTools = ["read_post", "view_comments", "like_post", "favorite_post", "share_post", "write_comment", "like_comment", "exit_browsing"] as const;
 
 function context(overrides: Partial<RunParticipantContext>): RunParticipantContext {
