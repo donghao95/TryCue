@@ -898,7 +898,6 @@ describe("tool direct commit state machine", () => {
       { stepNumber: 1, inputTokens: 20, outputTokens: 2, totalTokens: 22, finishReason: "stop" }
     ]);
     expect(traces[0]!.metadataJson).toMatchObject({
-      metadata: expect.objectContaining({ source: "integration_test" }),
       toolCallCount: 1
     });
 

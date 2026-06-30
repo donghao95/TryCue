@@ -1,5 +1,5 @@
 import { prisma, type Prisma } from "@trycue/db";
-import type { LanguageModelUsage, TelemetryIntegration, TelemetrySettings } from "ai";
+import type { LanguageModelUsage, Telemetry, TelemetryOptions } from "ai";
 import { log } from "../logger.js";
 
 export type AiSdkTraceInput = {
@@ -14,34 +14,23 @@ export type AiSdkTraceInput = {
 };
 
 export function aiSdkTrace(input: AiSdkTraceInput): {
-  experimental_telemetry?: TelemetrySettings;
+  telemetry?: TelemetryOptions;
 } {
   if (!input.runId) return {};
-  const metadata = cleanTelemetryMetadata({
-    runId: input.runId,
-    taskType: input.taskType,
-    promptVersion: input.promptVersion,
-    agentTurnId: input.agentTurnId,
-    participantId: input.participantId,
-    jobId: input.jobId,
-    profileId: input.profileId,
-    ...(input.metadata ?? {})
-  });
   return {
-    experimental_telemetry: {
+    telemetry: {
       isEnabled: true,
       recordInputs: false,
       recordOutputs: false,
       functionId: input.taskType,
-      metadata,
       integrations: [createTraceIntegration(input)]
     }
   };
 }
 
-function createTraceIntegration(input: Required<Pick<AiSdkTraceInput, "taskType">> & AiSdkTraceInput): TelemetryIntegration {
+function createTraceIntegration(input: Required<Pick<AiSdkTraceInput, "taskType">> & AiSdkTraceInput): Telemetry {
   return {
-    onStepFinish: async (event) => {
+    onStepEnd: async (event) => {
       if (!input.runId) return;
       const usage = normalizeUsage(event.usage);
       try {
@@ -68,8 +57,7 @@ function createTraceIntegration(input: Required<Pick<AiSdkTraceInput, "taskType"
               noCacheInputTokens: usage.noCacheInputTokens,
               rawUsageJson: usage.rawUsageJson,
               metadataJson: cleanJson({
-                functionId: event.functionId,
-                metadata: event.metadata,
+                functionId: input.taskType,
                 toolCallCount: event.toolCalls.length,
                 finishReason: event.finishReason,
                 rawFinishReason: event.rawFinishReason
@@ -132,15 +120,6 @@ function normalizeUsage(usage: LanguageModelUsage | undefined) {
       ? cleanJson(record.raw) as Prisma.InputJsonValue
       : undefined
   };
-}
-
-function cleanTelemetryMetadata(input: Record<string, string | number | boolean | null | undefined>) {
-  return Object.fromEntries(
-    Object.entries(input).filter((entry): entry is [string, string | number | boolean] => {
-      const value = entry[1];
-      return typeof value === "string" || typeof value === "number" || typeof value === "boolean";
-    })
-  );
 }
 
 function cleanJson(value: unknown): unknown {
