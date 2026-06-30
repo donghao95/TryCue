@@ -32,10 +32,15 @@ import {
 import { ALL_TOOLS, loadJourneyTranscript, renderSessionMessages } from "../runtime/agentSessions.js";
 import { PROMPT_VERSION_AGENT } from "./promptVersions.js";
 
-function delay(minMs: number, maxMs: number): Promise<void> {
-  if (process.env.NODE_ENV === "test" || process.env.VITEST === "true") return Promise.resolve();
-  const ms = minMs + Math.random() * (maxMs - minMs);
-  return new Promise((resolve) => setTimeout(resolve, ms));
+/**
+ * Mock agent 展示延迟。默认 0(无延迟),test 和 dev 行为一致。
+ * 本地 demo 需要看实时过程时,显式设置 MOCK_AGENT_DELAY_MS=2000 等环境变量。
+ * 非法值或 <= 0 一律视为 0,不阻塞。
+ */
+function delay(): Promise<void> {
+  const configured = Number.parseInt(process.env.MOCK_AGENT_DELAY_MS ?? "0", 10);
+  if (Number.isNaN(configured) || configured <= 0) return Promise.resolve();
+  return new Promise((resolve) => setTimeout(resolve, configured));
 }
 
 const names = [
@@ -352,7 +357,7 @@ export class MockAgentProvider implements AgentProvider {
     bodyText: string;
     count: number;
   }) {
-    await delay(1200, 1800);
+    await delay();
     const allocations = allocateDemoTemplateGroups(input.count);
     const directives = allocations.map(({ segment, items }) => {
       const meta = segmentMeta[segment];
@@ -395,7 +400,7 @@ export class MockAgentProvider implements AgentProvider {
     plan: AudienceSamplingPlanViewForProvider;
     messages: AudienceSamplingPlanRevisionMessage[];
   }): Promise<AudienceSamplingPlanRevisionProposal> {
-    await delay(350, 650);
+    await delay();
     const latest = input.messages.at(-1)?.visibleText ?? "";
     const directive = input.plan.directives[0];
     if (!directive) {
@@ -477,7 +482,7 @@ export class MockAgentProvider implements AgentProvider {
     progress: AudienceGenerationProgressView;
     messages: AudienceSeatRevisionMessage[];
   }): Promise<AudienceSeatRevisionProposal> {
-    await delay(350, 650);
+    await delay();
     const latest = input.messages.at(-1)?.visibleText ?? "";
     const profile = input.progress.profiles.find((item) => item.identityStatus === "identity_ready") ?? input.progress.profiles[0];
     if (!profile) {
@@ -571,7 +576,7 @@ export class MockAgentProvider implements AgentProvider {
     chunkCount: number;
     onFrame: (frame: AudienceProfileExpansionFrame) => void | Promise<void>;
   }): Promise<void> {
-    await delay(650, 950);
+    await delay();
     const chunkStart = input.chunkStart;
     const chunkCount = input.chunkCount;
     const segment = segmentOrder.find((item) => input.directive.description.includes(item)) ?? "核心用户";
@@ -598,7 +603,7 @@ export class MockAgentProvider implements AgentProvider {
     };
     platformName?: string;
   }): Promise<GeneratedAudience> {
-    await delay(550, 850);
+    await delay();
     const hash = hashString(input.profile.profileId ?? "");
     const displayName = names[hash % names.length]!;
     const demographics = input.profile.demographics as Record<string, string>;
@@ -631,25 +636,17 @@ export class MockAgentProvider implements AgentProvider {
     let thoughtText = "";
     const executedSteps: Array<{ actionId: string; step: StepResult<ToolSet>; toolCalls: ParsedToolCall[] }> = [];
 
+    // 在循环外解析一次角色,避免每个 step 都查 DB。
+    // 角色基于 participant 在 run 内的顺序位置,整个 journey 保持一致。
+    const deterministicRole = await resolveParticipantDeterministicRole(context.runId, context.participantId);
     for (let guard = context.stepIndex; guard < maxSteps; guard += 1) {
-      await delay(1500, 3000);
+      await delay();
       // 使用 participantId 的稳定 hash 叠加 stepIndex 作为 indexHint，
       // 避免 UUID 数字末位带来的随机性；同一观众同一 stepIndex 行为可复现，
       // 不同 stepIndex 仍有变化以覆盖 read_post / like_comment / write_comment 等分支
       const indexHint = hashString(currentContext.participantId) + currentContext.stepIndex;
-      // 确定性 mock:仅在 test/Vitest 环境下,固定第一个 participant feed-only exit、
-      // 第二个 participant open_post,保证 smoke run 一定同时覆盖 opener 和 skip,
-      // 不依赖 indexHint % 5 的概率分支
-      const deterministicRole = currentContext.stepIndex === 0
-        ? await resolveParticipantDeterministicRole(currentContext.runId, currentContext.participantId)
-        : "default";
       const toolCalls = enrichMockToolCalls(
-        planMockTools(
-          currentContext,
-          indexHint,
-          deterministicRole === "force_feed_only",
-          deterministicRole === "force_open_post"
-        ),
+        planMockTools(currentContext, indexHint, deterministicRole),
         currentContext
       );
       thoughtText = buildThought(currentContext, toolCalls);
@@ -986,17 +983,20 @@ async function contextForNextMockTurn(
 export function planMockTools(
   context: RunParticipantContext,
   indexHint: number,
-  forceFeedOnlyExit = false,
-  forceOpenPost = false
+  role: DeterministicMockRole = "default"
 ): ParsedToolCall[] {
+  // 固定角色路径优先:reader/favoriter/commenter 在所有 step 走固定路径,
+  // 覆盖 read_post / like_post / favorite_post / view_comments / write_comment 关键工具
+  if (role === "reader") return planReaderPath(context);
+  if (role === "favoriter") return planFavoriterPath(context);
+  if (role === "commenter") return planCommenterPath(context, indexHint);
+
   if (!context.hasOpenedPost) {
-    // 确定性 open_post 优先于 feed-only,保证 smoke run 至少有一个 opener
-    if (context.stepIndex === 0 && forceOpenPost) {
-      return [{ toolName: "open_post", args: {} }];
-    }
-    if (context.stepIndex === 0 && (forceFeedOnlyExit || indexHint % 5 === 0)) {
+    // feed_only 角色:step 0 feed-only exit,保证 smoke run 一定有 skipped 观众
+    if (role === "feed_only" && context.stepIndex === 0) {
       return [mockExit("not_relevant", "feed_only", "low", "low")];
     }
+    // solo / opener / default:open_post
     return [{ toolName: "open_post", args: {} }];
   }
 
@@ -1041,34 +1041,81 @@ export function planMockTools(
   return [];
 }
 
-type DeterministicMockRole = "force_feed_only" | "force_open_post" | "default";
+type DeterministicMockRole =
+  | "solo"        // audienceCount=1,唯一观众 open_post,后续走概率分支
+  | "feed_only"   // 第 1 个:feed_only exit,保证有 skipped 观众
+  | "opener"      // 第 2 个:open_post,后续走概率分支,保证有 opener
+  | "reader"      // 第 3 个:open_post → read_post → like_post → exit
+  | "favoriter"   // 第 4 个:open_post → favorite_post → view_comments → exit
+  | "commenter"   // 第 5 个:open_post → write_comment → exit
+  | "default";    // 第 6+:走原 indexHint 概率分支,保留多样性
 
 /**
- * 确定性 mock 角色解析:仅在 test/Vitest 环境下启用,避免影响本地 dev mock run。
+ * MockAgentProvider 始终是确定性模拟器,test 和 dev 走同一套行为。
  *
  * 规则:
- * - participant 总数 <= 1 时返回 "default",保证 audienceCount=1 的 run 唯一观众不被强制 skip
- * - 第一个 participant 强制 feed_only exit
- * - 第二个 participant 强制 open_post,保证 smoke run 一定有 opener
- * - 其他 participant 走原 indexHint 概率分支
+ * - participant 总数 <= 1 时返回 "solo",唯一观众 open_post 不被强制 skip
+ * - 前 5 个 participant 分别固定为 feed_only / opener / reader / favoriter / commenter,
+ *   覆盖 smoke 必须的关键行为(open/skip/read/like/favorite/view_comments/write_comment)
+ * - 第 6+ 个 participant 走原 indexHint 概率分支,保留行为多样性
  *
- * 一次查询拿前两个 participant,避免每个 step 都查两次 DB。
+ * 一次查询拿前 5 个 participant,在 runAudienceTurn 循环外调用,每个 participant 只查一次。
  */
 async function resolveParticipantDeterministicRole(
   runId: string,
   participantId: string
 ): Promise<DeterministicMockRole> {
-  if (process.env.NODE_ENV !== "test" && process.env.VITEST !== "true") return "default";
-  const firstTwo = await prisma.runParticipant.findMany({
+  const firstFive = await prisma.runParticipant.findMany({
     where: { runId },
     orderBy: { id: "asc" },
     select: { id: true },
-    take: 2
+    take: 5
   });
-  if (firstTwo.length <= 1) return "default";
-  if (firstTwo[0]!.id === participantId) return "force_feed_only";
-  if (firstTwo[1]!.id === participantId) return "force_open_post";
-  return "default";
+  if (firstFive.length <= 1) return "solo";
+  const index = firstFive.findIndex((p) => p.id === participantId);
+  if (index === -1) return "default";
+  const roles: DeterministicMockRole[] = ["feed_only", "opener", "reader", "favoriter", "commenter"];
+  return roles[index] ?? "default";
+}
+
+/**
+ * reader 固定路径:open_post → read_post(full) → like_post → exit
+ * 覆盖 read_post 和 like_post 关键工具。
+ */
+function planReaderPath(context: RunParticipantContext): ParsedToolCall[] {
+  if (!context.hasOpenedPost) {
+    return [{ toolName: "open_post", args: {} }];
+  }
+  if (context.stepIndex === 1) return [mockReadPost("full")];
+  if (context.stepIndex === 2) return [{ toolName: "like_post", args: {} }];
+  return [mockExit("finished_normally", "full", "high", "high")];
+}
+
+/**
+ * favoriter 固定路径:open_post → favorite_post → view_comments → exit
+ * 覆盖 favorite_post 和 view_comments 关键工具。
+ */
+function planFavoriterPath(context: RunParticipantContext): ParsedToolCall[] {
+  if (!context.hasOpenedPost) {
+    return [{ toolName: "open_post", args: {} }];
+  }
+  if (context.stepIndex === 1) return [{ toolName: "favorite_post", args: {} }];
+  if (context.stepIndex === 2) return [{ toolName: "view_comments", args: { cursor: null } }];
+  return [mockExit("finished_normally", "partial", "medium", "medium")];
+}
+
+/**
+ * commenter 固定路径:open_post → write_comment → exit
+ * 覆盖 write_comment 关键工具。评论文案用 indexHash 做确定性变化。
+ */
+function planCommenterPath(context: RunParticipantContext, indexHint: number): ParsedToolCall[] {
+  if (!context.hasOpenedPost) {
+    return [{ toolName: "open_post", args: {} }];
+  }
+  if (context.stepIndex === 1) {
+    return [mockWriteComment(mockCommentForIndex(indexHint), indexHint, null)];
+  }
+  return [mockExit("finished_normally", "partial", "medium", "medium")];
 }
 
 type DemoCommentPoolName = keyof typeof demoCommentPools;
