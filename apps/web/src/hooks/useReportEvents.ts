@@ -14,13 +14,16 @@ import type { LiveEventEnvelope } from "@trycue/shared/live-events";
  *   a server-side job) regenerates the report, the viewer reloads it.
  *
  * Behavior:
- * - Opens an SSE connection to the same `/api/runs/:runId/events` endpoint.
+ * - Opens an SSE connection to the same `/api/runs/:runId/events` endpoint
+ *   with `?liveOnly=true`.
  * - Only subscribes to `report.regenerated`; ignores everything else.
  * - Reconnects automatically via the browser's native EventSource retry.
- * - No `?after=` replay: the report page loads the latest report on mount via
- *   `loadReport`, and only cares about regenerations that happen while the
- *   page is open. Historical `report.regenerated` events from before the
- *   connection are not needed.
+ * - `?liveOnly=true` only suppresses the no-cursor initial replay: the report
+ *   page loads the latest report on mount via `loadReport`, so historical
+ *   events from before the connection are not needed. On browser-driven
+ *   reconnects EventSource re-sends `Last-Event-ID`, and the server then
+ *   DOES replay durable events from that cursor forward — so a
+ *   `report.regenerated` produced during the disconnect is still delivered.
  */
 export interface UseReportEventsParams {
   /** Run id from the report route; empty string when not on a report page. */
