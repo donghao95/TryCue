@@ -1,0 +1,80 @@
+name: Bug 报告
+description: 报告 TryCue 的 Bug
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        感谢报告 Bug！请尽量填写以下信息，帮助快速定位问题。
+        如果是安全漏洞，请按 [SECURITY.md](/SECURITY.md) 流程私下报告，**不要开公开 Issue**。
+
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: Bug 描述
+      description: 简述发生了什么问题。
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: 复现步骤
+      description: 最小可复现步骤。
+      placeholder: |
+        1. 启动 `pnpm dev:local`
+        2. 进入「新建试映」
+        3. ...
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: 期望行为
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: 实际行为
+    validations:
+      required: true
+
+  - type: dropdown
+    id: runtime-mode
+    attributes:
+      label: 运行模式
+      options:
+        - mock
+        - real
+        - 不确定
+    validations:
+      required: true
+
+  - type: input
+    id: env
+    attributes:
+      label: 环境信息
+      description: 操作系统、Node 版本、pnpm 版本、TryCue commit / 版本。
+      placeholder: "Windows 11, Node 24.x, pnpm 10.4.0, commit abc1234"
+    validations:
+      required: true
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: 相关日志 / 截图
+      description: 终端日志、浏览器控制台、截图等。请删除任何 API Key 后再粘贴。
+      render: shell
+
+  - type: checkboxes
+    id: terms
+    attributes:
+      label: 自检
+      options:
+        - label: 我已阅读 [docs/00_README_文档索引.md](/docs/00_README_文档索引.md) 中相关领域文档
+          required: false
+        - label: 我已确认这不是安全漏洞（安全漏洞请走 SECURITY.md）
+          required: true

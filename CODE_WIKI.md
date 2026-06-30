@@ -1337,10 +1337,10 @@ pnpm dev:local
 - Web: http://localhost:3000
 - API: http://localhost:4000
 
-### 9.2 跳过 Docker 检查
+### 9.2 写入 demo 种子数据
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File ./scripts/run-local.ps1 -SkipDocker
+powershell -ExecutionPolicy Bypass -File ./scripts/run-local.ps1 -SeedDemo
 ```
 
 ### 9.3 手动启动

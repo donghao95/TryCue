@@ -50,6 +50,7 @@ docs/ChatGPT Image 2026年5月29日 17_56_12.png
 .codex-artifacts/
 .codex-run/
 .codex-runlogs/
+.codex-tmp/
 .workbuddy/
 .playwright-mcp/
 code-review-fix-report.md

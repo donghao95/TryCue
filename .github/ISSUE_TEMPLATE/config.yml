@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: 安全漏洞报告
+    url: https://github.com/donghao95/TryCue/security/advisories/new
+    about: 安全漏洞请走私有报告流程，不要开公开 Issue。
+  - name: 项目文档
+    url: https://github.com/donghao95/TryCue/blob/main/docs/00_README_文档索引.md
+    about: 提问前请先查阅文档索引和对应领域规格文档。

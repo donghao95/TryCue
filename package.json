@@ -1,6 +1,27 @@
 {
   "name": "trycue",
+  "version": "0.1.0",
   "private": true,
+  "description": "AI 内容试映工作台：在真正发布前，把内容交给一组 AI 观众试映。",
+  "license": "Apache-2.0",
+  "author": "donghao95",
+  "homepage": "https://github.com/donghao95/TryCue",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/donghao95/TryCue.git"
+  },
+  "bugs": {
+    "url": "https://github.com/donghao95/TryCue/issues"
+  },
+  "keywords": [
+    "ai",
+    "audience-simulation",
+    "content-preview",
+    "agent",
+    "llm",
+    "trycue",
+    "mock"
+  ],
   "type": "module",
   "packageManager": "pnpm@10.4.0",
   "scripts": {

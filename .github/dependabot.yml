@@ -1,0 +1,50 @@
+version: 2
+
+updates:
+  # pnpm / npm 依赖（根 + 各 workspace 包）
+  - package-ecosystem: "npm"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    open-pull-requests-limit: 5
+    versioning-strategy: increase
+    commit-message:
+      prefix: "chore(deps)"
+      include: "scope"
+    labels:
+      - "dependencies"
+    groups:
+      # 把 @types/* 和其他开发类型依赖打包升级，减少 PR 数量
+      types:
+        patterns:
+          - "@types/*"
+      # 把 @trycue 内部 workspace 依赖单独分组（通常跟随本地版本）
+      trycue:
+        patterns:
+          - "@trycue/*"
+      # 把 prisma 相关依赖打包（@prisma/client 和 prisma 版本需保持一致）
+      prisma:
+        patterns:
+          - "prisma"
+          - "@prisma/client"
+      # 把 ai-sdk 相关依赖打包（版本需保持一致）
+      ai-sdk:
+        patterns:
+          - "@ai-sdk/*"
+          - "ai"
+          - "openai"
+
+  # GitHub Actions 版本更新
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    open-pull-requests-limit: 3
+    commit-message:
+      prefix: "chore(ci)"
+      include: "scope"
+    labels:
+      - "dependencies"
+      - "ci"

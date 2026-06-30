@@ -1,3 +1,6 @@
+# 注意：V1 本地开发使用 SQLite（见 .env.example 的 DATABASE_URL），
+# 不需要启动本文件中的 Postgres。此文件仅为未来生产环境迁移 PostgreSQL
+# 保留的实验性配置，外部贡献者 clone 仓库后无需 docker compose up。
 services:
   postgres:
     image: postgres:17-alpine
