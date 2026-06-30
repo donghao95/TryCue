@@ -960,7 +960,7 @@ export function App() {
   // this dedicated hook is the only SSE connection on that page.
   useReportEvents({
     runId: route.kind === "report" ? route.runId : "",
-    onReportRegenerated: () => void loadReport(route.kind === "report" ? route.runId : ""),
+    onReportRegenerated: () => void loadReport(route.kind === "report" ? route.runId : "", { preserveStatus: true }),
     onMalformed: () => showAppError(t("audienceGen.toast.sseError"))
   });
 
@@ -1686,7 +1686,7 @@ export function App() {
     if (distanceToBottom < 120) loadMoreRuntimeLogs();
   }
 
-  async function loadReport(id = runId) {
+  async function loadReport(id = runId, options?: { preserveStatus?: boolean }) {
     if (!id) return;
     const response = await request<ReportView>(`/api/runs/${id}/report`);
     if (!response.success) {
@@ -1696,7 +1696,11 @@ export function App() {
       return;
     }
     setReport(response.data);
-    setUiStatus("completed");
+    // SSE-triggered reloads must not flip the UI to "completed": the
+    // regeneration path allows paused/completed runs to regenerate without
+    // touching run status (see apps/api/src/runtime/report.ts). Only the
+    // report-route entry point should transition to "completed".
+    if (!options?.preserveStatus) setUiStatus("completed");
   }
 
   async function regenerateReport() {
@@ -2857,7 +2861,9 @@ export function App() {
       // `regenerateReport` action also updates local state synchronously, but
       // this SSE handler covers cross-session updates and any future server-side
       // regeneration paths.
-      void loadReport(eventRunId);
+      // preserveStatus: the backend regeneration path does not touch run status
+      // (paused/completed stay as-is), so the UI must not flip to "completed".
+      void loadReport(eventRunId, { preserveStatus: true });
     }
 
     // Compile-time exhaustiveness check — see assertLiveEventTypeExhaustive.
