@@ -86,6 +86,9 @@ export async function buildApp(config: AppConfig) {
   const uploadDir = resolveWorkspacePath("apps/api/uploads");
   const scheduler = new Scheduler(config, getLlmConfig, getAgentProvider, aiTaskRunner, uploadDir);
   const runService = new RunService(config, getLlmConfig, getAgentProvider, scheduler, uploadDir);
+  app.addHook("onClose", async () => {
+    await runService.stop();
+  });
 
   await app.register(cors, { origin: config.appUrl });
   await app.register(multipart, {

@@ -11,7 +11,8 @@
     "lint": "tsc -p tsconfig.json --noEmit",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "vitest run --dir src --exclude \"**/*.integration.test.ts\"",
-    "test:integration": "vitest run -c vitest.integration.config.ts"
+    "test:integration": "vitest run -c vitest.integration.config.ts",
+    "test:integration:smoke": "vitest run -c vitest.integration.smoke.config.ts"
   },
   "dependencies": {
     "@ai-sdk/openai": "^3.0.68",

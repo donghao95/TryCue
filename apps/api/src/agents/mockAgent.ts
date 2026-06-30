@@ -33,7 +33,7 @@ import { ALL_TOOLS, loadJourneyTranscript, renderSessionMessages } from "../runt
 import { PROMPT_VERSION_AGENT } from "./promptVersions.js";
 
 function delay(minMs: number, maxMs: number): Promise<void> {
-  if (process.env.NODE_ENV === "test") return Promise.resolve();
+  if (process.env.NODE_ENV === "test" || process.env.VITEST === "true") return Promise.resolve();
   const ms = minMs + Math.random() * (maxMs - minMs);
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
@@ -637,7 +637,10 @@ export class MockAgentProvider implements AgentProvider {
       // 避免 UUID 数字末位带来的随机性；同一观众同一 stepIndex 行为可复现，
       // 不同 stepIndex 仍有变化以覆盖 read_post / like_comment / write_comment 等分支
       const indexHint = hashString(currentContext.participantId) + currentContext.stepIndex;
-      const toolCalls = enrichMockToolCalls(planMockTools(currentContext, indexHint), currentContext);
+      const forceFeedOnlyExit = currentContext.stepIndex === 0
+        ? await isDeterministicFeedOnlyExitParticipant(currentContext.runId, currentContext.participantId)
+        : false;
+      const toolCalls = enrichMockToolCalls(planMockTools(currentContext, indexHint, forceFeedOnlyExit), currentContext);
       thoughtText = buildThought(currentContext, toolCalls);
       const enrichedToolCalls = toolCalls.map((call, index) => enrichMockToolCall(currentContext, currentActionId, call, index));
 
@@ -969,9 +972,9 @@ async function contextForNextMockTurn(
   };
 }
 
-export function planMockTools(context: RunParticipantContext, indexHint: number): ParsedToolCall[] {
+export function planMockTools(context: RunParticipantContext, indexHint: number, forceFeedOnlyExit = false): ParsedToolCall[] {
   if (!context.hasOpenedPost) {
-    if (context.stepIndex === 0 && indexHint % 5 === 0) {
+    if (context.stepIndex === 0 && (forceFeedOnlyExit || indexHint % 5 === 0)) {
       return [mockExit("not_relevant", "feed_only", "low", "low")];
     }
     return [{ toolName: "open_post", args: {} }];
@@ -1016,6 +1019,15 @@ export function planMockTools(context: RunParticipantContext, indexHint: number)
   }
 
   return [];
+}
+
+async function isDeterministicFeedOnlyExitParticipant(runId: string, participantId: string) {
+  const firstParticipant = await prisma.runParticipant.findFirst({
+    where: { runId },
+    orderBy: { id: "asc" },
+    select: { id: true }
+  });
+  return firstParticipant?.id === participantId;
 }
 
 type DemoCommentPoolName = keyof typeof demoCommentPools;

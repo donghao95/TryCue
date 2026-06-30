@@ -79,7 +79,10 @@ async function mapWithConcurrency<T, R>(items: T[], limit: number, fn: (item: T,
 
 export class RunService {
   private readonly activeGenerationJobs = new Set<string>();
+  private readonly generationJobPromises = new Map<string, Promise<void>>();
+  private readonly audienceConfirmationLocks = new Map<string, Promise<void>>();
   private readonly generationWorkerId = `audience-generator-${process.pid}`;
+  private stopping = false;
 
   constructor(
     private readonly config: AppConfig,
@@ -88,6 +91,11 @@ export class RunService {
     private readonly scheduler: Scheduler,
     private readonly uploadDir: string
   ) {}
+
+  async stop() {
+    this.stopping = true;
+    await Promise.allSettled(this.generationJobPromises.values());
+  }
 
   async createRun(input: CreateRunRequest) {
     const audienceCount = this.resolveAudienceCount(input);
@@ -428,9 +436,15 @@ export class RunService {
   }
 
   private startAudienceGenerationJob(jobId: string) {
+    if (this.stopping) return;
     if (this.activeGenerationJobs.has(jobId)) return;
     this.activeGenerationJobs.add(jobId);
-    void this.runAudienceGenerationJob(jobId).finally(() => this.activeGenerationJobs.delete(jobId));
+    const promise = this.runAudienceGenerationJob(jobId).finally(() => {
+      this.activeGenerationJobs.delete(jobId);
+      this.generationJobPromises.delete(jobId);
+    });
+    this.generationJobPromises.set(jobId, promise);
+    void promise;
   }
 
   private async createInternalAudienceGenerationJob(
@@ -462,6 +476,7 @@ export class RunService {
   }
 
   private async runAudienceGenerationJob(jobId: string) {
+    if (this.stopping) return;
     const lockUntil = new Date(Date.now() + AUDIENCE_JOB_LOCK_DURATION_MS);
     const claimed = await prisma.audienceGenerationJob.updateMany({
       where: {
@@ -1318,10 +1333,32 @@ export class RunService {
   }
 
   async confirmAudienceSamplingPlan(runId: string) {
+    return this.withAudienceConfirmationLock(runId, () => this.confirmAudienceSamplingPlanLocked(runId));
+  }
+
+  private async withAudienceConfirmationLock<T>(runId: string, fn: () => Promise<T>) {
+    const previous = this.audienceConfirmationLocks.get(runId) ?? Promise.resolve();
+    let release!: () => void;
+    const current = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const chained = previous.catch(() => undefined).then(() => current);
+    this.audienceConfirmationLocks.set(runId, chained);
+    await previous.catch(() => undefined);
+    try {
+      return await fn();
+    } finally {
+      release();
+      if (this.audienceConfirmationLocks.get(runId) === chained) {
+        this.audienceConfirmationLocks.delete(runId);
+      }
+    }
+  }
+
+  private async confirmAudienceSamplingPlanLocked(runId: string) {
     const run = await prisma.testRun.findUnique({ where: { id: runId } });
     if (!run) throw new ApiError("RUN_NOT_FOUND", "试映任务不存在", 404);
     this.assertAudienceEditableRun(run.status);
-    // Guard: SQLite serializes write transactions; the plan.status check below prevents duplicate expansion jobs.
     const job = await prisma.$transaction(async (tx) => {
       const activeJob = await tx.audienceGenerationJob.findFirst({
         where: { runId, active: true, status: { in: activeAudienceGenerationJobStatuses } }
@@ -1333,8 +1370,8 @@ export class RunService {
       const quantityTotal = directiveQuantityTotal(plan.directives);
       const validation = samplingPlanValidation(quantityTotal ?? plan.totalCount, plan.directives);
       if (!validation.isQuantityValid || plan.directives.length === 0) throw new ApiError("AUDIENCE_PLAN_INVALID", "人群计划数量不合法", 400, validation);
-      await tx.audienceSamplingPlan.update({
-        where: { id: plan.id },
+      const confirmed = await tx.audienceSamplingPlan.updateMany({
+        where: { id: plan.id, status: "ready_for_review" },
         data: {
           confirmedAt: new Date(),
           status: "expanding_profiles",
@@ -1342,6 +1379,7 @@ export class RunService {
           errorMessage: null
         }
       });
+      if (confirmed.count === 0) throw new ApiError("INVALID_PLAN_STATUS", "只有待确认的观众计划可以确认", 409);
       await tx.testRun.update({ where: { id: runId }, data: { status: "generating_audience", audienceCount: quantityTotal, errorMessage: null } });
       return tx.audienceGenerationJob.create({
         data: {
