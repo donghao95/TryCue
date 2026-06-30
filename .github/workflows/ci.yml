@@ -53,8 +53,10 @@ jobs:
       - name: Production startup smoke
         env:
           DATABASE_URL: file:./data/trycue_test.db
-          APP_ENV: test
+          APP_ENV: smoke
           LLM_CONFIG_PATH: config/llm.example.yaml
+          ENABLE_SCHEDULER: "false"
+          LOG_LEVEL: warn
         run: |
           node apps/api/dist/index.js &
           PID=$!
