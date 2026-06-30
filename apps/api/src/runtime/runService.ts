@@ -1,14 +1,10 @@
-import { unlink } from "node:fs/promises";
 import { prisma, Prisma, type AudienceGenerationJob, type AudienceGenerationJobStatus, type RunStatus } from "@trycue/db";
 import type {
   AudienceGenerationProgressView,
-  AudienceGenerationJobView,
   AudiencePlanFrame,
   AudiencePlanPreview,
   AudiencePlanProgressEvent,
-  AudiencePersonaJson,
-  AudienceProfileView,
-  AudienceSamplingDirective,
+  AudienceSamplingPlanView,
   CreateAudienceProfileRequest,
   CreateAudienceSamplingPlanRevisionSuggestionRequest,
   CreateAudienceSeatRevisionSuggestionRequest,
@@ -16,7 +12,6 @@ import type {
   CreateAudienceSamplingPlanRequest,
   FavoriteAudienceIdentityRequest,
   RetryAudienceIdentitiesRequest,
-  AudienceSamplingPlanView,
   UpdateAudienceIdentityRequest,
   UpdateAudienceSamplingDirectiveRequest,
   UpdateAudienceSamplingPlanRequest
@@ -31,7 +26,7 @@ import type {
 import type { AppConfig } from "../config.js";
 import { ApiError } from "../errors.js";
 import { log } from "../logger.js";
-import type { AgentProvider, AudienceProfilePlan, AudienceSamplingDirectiveView, AudienceSamplingPlanDraft, AudienceSamplingPlanViewForProvider } from "../agents/types.js";
+import type { AgentProvider, AudienceProfilePlan, AudienceSamplingDirectiveView, AudienceSamplingPlanViewForProvider } from "../agents/types.js";
 import type { LlmRuntimeConfig } from "../llmConfigStore.js";
 import { shouldUseRealLlm } from "../llmConfigStore.js";
 import { recordLiveEvent, pushLiveEvent } from "../liveEvents.js";
@@ -43,7 +38,55 @@ import { requireSingleContentVersion } from "./contentVersions.js";
 import { cleanupRuntimeFacts, cleanupParticipantRuntimeFacts } from "./runDataLifecycle.js";
 import { createRunLogWithEvent } from "./runLogs.js";
 import { appendSystemNoticeItem } from "./agentSessions.js";
-import { localAssetPathForStorageKey, localStorageKeyFromUrl, prepareModelImageUrls } from "./modelImages.js";
+// Refactored helpers (stage 9): views/builders, image assets, plan helpers,
+// identity cleanup, and profile snapshots now live in their own modules.
+// Dependency direction (no cycles):
+//   audienceGenerationViews (leaf) ← runImageAssets, audiencePlanHelpers
+//   identityCleanup, audienceProfileSnapshots (independent)
+//   runService (root) ← all of the above
+import {
+  buildAudienceGenerationProgress,
+  buildAudienceSamplingPlanView,
+  buildAudienceSamplingPlanViewById,
+  buildDirectiveProgress,
+  buildProviderPlanView,
+  directiveQuantityTotal,
+  directiveToProviderView,
+  isString,
+  jobView,
+  jsonStringArray,
+  objectRecord,
+  participantView,
+  profileView,
+  profileViewInclude,
+  samplingPlanValidation
+} from "./audienceGenerationViews.js";
+import {
+  cleanupUnreferencedAssets,
+  contentImageUrls,
+  linkContentVersionImages,
+  normalizeInputImageUrls,
+  normalizeStoredImageUrls,
+  prepareAgentImageUrls as prepareAgentImageUrlsHelper,
+  unique
+} from "./runImageAssets.js";
+import {
+  REQUIRED_DEMOGRAPHICS_FIELDS,
+  normalizePersonaJson,
+  syncEditableSamplingPlanTotal,
+  validateAudienceSamplingPlanDraft
+} from "./audiencePlanHelpers.js";
+import {
+  assertNoRuntimeAudienceReferences,
+  hasCompleteProfileIdentity,
+  profileIdentityIds,
+  shouldDeleteAgentIdentity
+} from "./identityCleanup.js";
+import {
+  jsonInputOrEmpty,
+  platformAccountSnapshot,
+  profileSnapshot
+} from "./audienceProfileSnapshots.js";
 
 /** Duration in ms before an audience generation job lock expires if the worker stops heartbeating. */
 const AUDIENCE_JOB_LOCK_DURATION_MS = 10 * 60 * 1000;
@@ -278,40 +321,11 @@ export class RunService {
   }
 
   private async cleanupUnreferencedAssets(assetIds: string[]) {
-    if (assetIds.length === 0) return { deletedAssets: 0, deletedLocalFiles: 0 };
-
-    // Batch: find all referenced asset IDs in one query
-    const referencedRows = await prisma.contentVersionImage.findMany({
-      where: { assetId: { in: assetIds } },
-      select: { assetId: true },
-      distinct: ["assetId"]
-    });
-    const referencedIds = new Set(referencedRows.map((r) => r.assetId));
-    const unreferencedIds = assetIds.filter((id) => !referencedIds.has(id));
-    if (unreferencedIds.length === 0) return { deletedAssets: 0, deletedLocalFiles: 0 };
-
-    // Batch: fetch all unreferenced assets
-    const assets = await prisma.asset.findMany({ where: { id: { in: unreferencedIds } } });
-
-    // Batch: delete all unreferenced assets
-    await prisma.asset.deleteMany({ where: { id: { in: unreferencedIds } } });
-
-    // Clean up local files
-    let deletedLocalFiles = 0;
-    for (const asset of assets) {
-      if (asset.storage === "local" && asset.storageKey) {
-        const filePath = localAssetPathForStorageKey(this.uploadDir, asset.storageKey);
-        if (filePath) {
-          const removed = await unlink(filePath).then(() => true).catch(() => false);
-          if (removed) deletedLocalFiles += 1;
-        }
-      }
-    }
-    return { deletedAssets: assets.length, deletedLocalFiles };
+    return cleanupUnreferencedAssets(this.uploadDir, assetIds);
   }
 
   private async prepareAgentImageUrls(imageUrls: string[]) {
-    return prepareModelImageUrls(imageUrls, this.uploadDir);
+    return prepareAgentImageUrlsHelper(this.uploadDir, imageUrls);
   }
 
   async createAudienceSamplingPlan(runId: string, input: CreateAudienceSamplingPlanRequest) {
@@ -2273,57 +2287,19 @@ export class RunService {
   }
 
   private async buildAudienceSamplingPlanView(runId: string) {
-    const plan = await prisma.audienceSamplingPlan.findUnique({
-      where: { runId },
-      include: { directives: { orderBy: { sortOrder: "asc" } } }
-    });
-    return plan ? samplingPlanView(plan) : null;
+    return buildAudienceSamplingPlanView(runId);
   }
 
   private async buildAudienceSamplingPlanViewById(planId: string) {
-    const plan = await prisma.audienceSamplingPlan.findUniqueOrThrow({
-      where: { id: planId },
-      include: { directives: { orderBy: { sortOrder: "asc" } } }
-    });
-    return samplingPlanView(plan);
+    return buildAudienceSamplingPlanViewById(planId);
   }
 
   private async buildAudienceGenerationProgress(runId: string): Promise<AudienceGenerationProgressView> {
-    const [plan, profiles, activeJob] = await Promise.all([
-      prisma.audienceSamplingPlan.findUnique({
-        where: { runId },
-        include: { directives: { orderBy: { sortOrder: "asc" } } }
-      }).catch(() => null),
-      prisma.audienceProfile.findMany({ where: { runId }, orderBy: [{ samplingDirectiveId: "asc" }, { sortOrder: "asc" }], include: profileViewInclude }),
-      prisma.audienceGenerationJob.findFirst({ where: { runId, active: true }, orderBy: { createdAt: "desc" } })
-    ]);
-    const profilesByDirective = new Map<string, typeof profiles>();
-    for (const profile of profiles) {
-      const key = profile.samplingDirectiveId ?? "";
-      profilesByDirective.set(key, [...(profilesByDirective.get(key) ?? []), profile]);
-    }
-    const directiveProgress = plan?.directives.map((directive) => {
-      const directiveProfiles = profilesByDirective.get(directive.id) ?? [];
-      return directiveProgressView(directive, directiveProfiles);
-    }) ?? [];
-    return {
-      runId,
-      planId: plan?.id ?? null,
-      status: plan?.status ?? "not_started",
-      total: plan?.totalCount ?? 0,
-      profileCreatedCount: profiles.length,
-      identityReadyCount: profiles.filter((profile) => profile.identityStatus === "identity_ready").length,
-      identityFailedCount: profiles.filter((profile) => profile.identityStatus === "identity_failed").length,
-      activeJob: activeJob ? jobView(activeJob) : null,
-      directives: directiveProgress,
-      profiles: profiles.map(profileView)
-    };
+    return buildAudienceGenerationProgress(runId);
   }
 
   private async buildDirectiveProgress(directiveId: string) {
-    const directive = await prisma.audienceSamplingDirective.findUniqueOrThrow({ where: { id: directiveId } });
-    const profiles = await prisma.audienceProfile.findMany({ where: { samplingDirectiveId: directiveId } });
-    return directiveProgressView(directive, profiles);
+    return buildDirectiveProgress(directiveId);
   }
 
   private async requireEditableSamplingPlan(runId: string) {
@@ -2391,34 +2367,12 @@ export class RunService {
     }
   }
 
-  private async buildProviderPlanView(planId: string): Promise<AudienceSamplingPlanViewForProvider> {
-    const view = await this.buildAudienceSamplingPlanViewById(planId);
-    return {
-      planId: view.planId,
-      runId: view.runId,
-      totalCount: view.totalCount,
-      status: view.status,
-      planMarkdown: view.planMarkdown,
-      dimensions: view.dimensions,
-      directives: view.directives.map((directive) => ({
-        id: directive.id,
-        sortOrder: directive.sortOrder,
-        name: directive.name,
-        description: directive.description,
-        quantity: directive.quantity,
-        diversityAxes: directive.diversityAxes,
-        rationale: directive.rationale,
-        expansionStatus: directive.expansionStatus,
-        expansionError: directive.expansionError
-      }))
-    };
+  private async buildProviderPlanView(planId: string) {
+    return buildProviderPlanView(planId);
   }
 
   private async assertNoRuntimeAudienceReferences(runId: string) {
-    const participantCount = await prisma.runParticipant.count({ where: { runId } });
-    if (participantCount > 0) {
-      throw new ApiError("REPLAN_BLOCKED", "已有观众入场或试映历史引用，不能破坏性重新规划", 409);
-    }
+    return assertNoRuntimeAudienceReferences(runId);
   }
 
   private async generateAudienceSamplingPlanOrFail(input: {
@@ -2461,323 +2415,6 @@ export class RunService {
   }
 }
 
-function normalizeInputImageUrls(input: CreateRunRequest) {
-  return uniqueNonEmptyStrings([input.coverImageUrl, ...(input.imageUrls ?? [])]).slice(0, 9);
-}
-
-function contentImageUrls(imageUrlsJson: unknown, coverImageUrl: string | null) {
-  const stored = Array.isArray(imageUrlsJson) ? imageUrlsJson : [];
-  return uniqueNonEmptyStrings([...stored, coverImageUrl]);
-}
-
-function uniqueNonEmptyStrings(values: unknown[]) {
-  return [...new Set(values.filter(isString).map((value) => value.trim()).filter(Boolean))];
-}
-
-const profileViewInclude = {
-  generatedAgent: true,
-  generatedPlatformAccount: true,
-  generatedUser: true
-} satisfies Prisma.AudienceProfileInclude;
-
-function profileView(profile: {
-  id: string;
-  samplingPlanId?: string | null;
-  samplingDirectiveId: string | null;
-  sampleIndex?: number;
-  generationJobId?: string | null;
-  sortOrder: number;
-  samplingLabel: string;
-  demographicsJson?: unknown;
-  identityStatus: string;
-  identityError: string | null;
-  identityGeneratedAt: Date | null;
-  generatedUserId: string | null;
-  generatedAgentId: string | null;
-  generatedPlatformAccountId: string | null;
-  generatedAgent?: {
-    id: string;
-    userId: string;
-    personaJson: unknown;
-    memorySummary: string | null;
-    retentionPolicy: string;
-    favoritedAt: Date | null;
-  } | null;
-  generatedUser?: { id: string; userType: string; nickname: string; avatarUrl: string | null } | null;
-  generatedPlatformAccount?: { id: string; userId: string; platform: string } | null;
-  createdAt: Date;
-  updatedAt: Date;
-}): AudienceProfileView {
-  return {
-    id: profile.id,
-    profileId: profile.id,
-    samplingPlanId: profile.samplingPlanId ?? null,
-    samplingDirectiveId: profile.samplingDirectiveId,
-    sampleIndex: profile.sampleIndex ?? 0,
-    generationJobId: profile.generationJobId,
-    sortOrder: profile.sortOrder,
-    samplingLabel: profile.samplingLabel,
-    demographicsJson: normalizeDemographics(profile.demographicsJson),
-    identityStatus: profile.identityStatus as AudienceProfileView["identityStatus"],
-    identityError: profile.identityError,
-    identityGeneratedAt: profile.identityGeneratedAt?.toISOString() ?? null,
-    generatedUserId: profile.generatedUserId,
-    generatedAgentId: profile.generatedAgentId,
-    generatedPlatformAccountId: profile.generatedPlatformAccountId,
-    identity: profile.generatedAgent
-      ? {
-          user: profile.generatedUser
-            ? {
-                id: profile.generatedUser.id,
-                userType: profile.generatedUser.userType,
-                nickname: profile.generatedUser.nickname,
-                avatarUrl: profile.generatedUser.avatarUrl
-              }
-            : null,
-          agent: {
-            id: profile.generatedAgent.id,
-            userId: profile.generatedAgent.userId,
-            memorySummary: profile.generatedAgent.memorySummary
-          },
-          platformAccount: profile.generatedPlatformAccount
-            ? {
-                id: profile.generatedPlatformAccount.id,
-                userId: profile.generatedPlatformAccount.userId,
-                platform: profile.generatedPlatformAccount.platform
-              }
-            : null,
-          personaJson: objectRecord(profile.generatedAgent.personaJson),
-          retentionPolicy: profile.generatedAgent.retentionPolicy,
-          favorited: Boolean(profile.generatedAgent.favoritedAt),
-          saved: Boolean(profile.generatedAgent.favoritedAt)
-        }
-      : null,
-    createdAt: profile.createdAt.toISOString(),
-    updatedAt: profile.updatedAt.toISOString()
-  };
-}
-
-function participantView(participant: {
-  id: string;
-  sourceProfileId: string | null;
-  samplingDirectiveId: string | null;
-  sortOrder: number;
-  userId: string;
-  agentId: string;
-  platformAccountId: string;
-  source: string;
-  displayNameSnapshot: string;
-  avatarUrlSnapshot: string | null;
-  profileSnapshotJson: unknown;
-  agentSnapshotJson: unknown;
-  platformAccountSnapshotJson: unknown;
-  runtimeStatus: string;
-  createdAt: Date;
-  updatedAt: Date;
-}) {
-  return {
-    participantId: participant.id,
-    id: participant.id,
-    sourceProfileId: participant.sourceProfileId,
-    samplingDirectiveId: participant.samplingDirectiveId,
-    sortOrder: participant.sortOrder,
-    userId: participant.userId,
-    agentId: participant.agentId,
-    platformAccountId: participant.platformAccountId,
-    source: participant.source,
-    displayName: participant.displayNameSnapshot,
-    avatarUrl: participant.avatarUrlSnapshot,
-    profileSnapshot: participant.profileSnapshotJson,
-    agentSnapshot: participant.agentSnapshotJson,
-    platformAccountSnapshot: participant.platformAccountSnapshotJson,
-    runtimeStatus: participant.runtimeStatus,
-    createdAt: participant.createdAt.toISOString(),
-    updatedAt: participant.updatedAt.toISOString()
-  };
-}
-
-function jobView(job: {
-  id: string;
-  runId: string;
-  scope: string;
-  status: string;
-  active: boolean;
-  profileId: string | null;
-  samplingPlanId?: string | null;
-  samplingDirectiveId?: string | null;
-  targetCount: number;
-  batchSize: number;
-  errorMessage: string | null;
-  attemptCount: number;
-  heartbeatAt: Date | null;
-  startedAt: Date | null;
-  completedAt: Date | null;
-  canceledAt: Date | null;
-  createdAt: Date;
-  updatedAt: Date;
-}): AudienceGenerationJobView {
-  return {
-    id: job.id,
-    runId: job.runId,
-    scope: job.scope as AudienceGenerationJobView["scope"],
-    status: job.status as AudienceGenerationJobView["status"],
-    active: job.active,
-    profileId: job.profileId,
-    samplingPlanId: job.samplingPlanId ?? null,
-    samplingDirectiveId: job.samplingDirectiveId ?? null,
-    targetCount: job.targetCount,
-    batchSize: job.batchSize,
-    errorMessage: job.errorMessage,
-    attemptCount: job.attemptCount,
-    heartbeatAt: job.heartbeatAt?.toISOString() ?? null,
-    startedAt: job.startedAt?.toISOString() ?? null,
-    completedAt: job.completedAt?.toISOString() ?? null,
-    canceledAt: job.canceledAt?.toISOString() ?? null,
-    createdAt: job.createdAt.toISOString(),
-    updatedAt: job.updatedAt.toISOString()
-  };
-}
-
-function directiveProgressView(
-  directive: { id: string; description: string; quantity: number; expansionStatus: string; expansionError: string | null },
-  profiles: Array<{ identityStatus: string }>
-) {
-  return {
-    directiveId: directive.id,
-    description: directive.description,
-    targetCount: directive.quantity,
-    profileCreatedCount: profiles.length,
-    identityReadyCount: profiles.filter((profile) => profile.identityStatus === "identity_ready").length,
-    identityFailedCount: profiles.filter((profile) => profile.identityStatus === "identity_failed").length,
-    generationStatus: directive.expansionStatus as "pending" | "generating" | "ready" | "failed",
-    generationError: directive.expansionError
-  };
-}
-
-function samplingPlanView(plan: {
-  id: string;
-  runId: string;
-  totalCount: number;
-  status: string;
-  planMarkdown: string;
-  dimensionsJson: unknown;
-  confirmedAt: Date | null;
-  directives: Array<{
-    id: string;
-    sortOrder: number;
-    name: string;
-    description: string;
-    quantity: number;
-    diversityAxesJson: unknown;
-    rationale: string;
-    groupRole: string;
-    samplingReason: string;
-    expansionStatus: string;
-    expansionError: string | null;
-  }>;
-}): AudienceSamplingPlanView {
-  const directives = plan.directives.map((directive) => ({
-    id: directive.id,
-    sortOrder: directive.sortOrder,
-    name: directive.name,
-    description: directive.description,
-    quantity: directive.quantity,
-    diversityAxes: jsonStringArray(directive.diversityAxesJson),
-    rationale: directive.rationale,
-    groupRole: directive.groupRole as AudienceSamplingDirective["groupRole"],
-    samplingReason: directive.samplingReason,
-    expansionStatus: directive.expansionStatus as "pending" | "generating" | "ready" | "failed",
-    expansionError: directive.expansionError
-  }));
-  return {
-    planId: plan.id,
-    runId: plan.runId,
-    totalCount: plan.totalCount,
-    status: plan.status as AudienceSamplingPlanView["status"],
-    planMarkdown: plan.planMarkdown,
-    dimensions: jsonStringArray(plan.dimensionsJson),
-    confirmedAt: plan.confirmedAt?.toISOString() ?? null,
-    directives,
-    validation: samplingPlanValidation(plan.totalCount, plan.directives)
-  };
-}
-
-function samplingPlanValidation(totalCount: number, directives: Array<{ quantity: number }>) {
-  const quantityTotal = directiveQuantityTotal(directives);
-  const issues: string[] = [];
-  if (!directives.length) issues.push("至少需要一条人群计划项");
-  for (const [index, directive] of directives.entries()) {
-    if (!Number.isInteger(directive.quantity) || directive.quantity < 0) issues.push(`第 ${index + 1} 条人群数量不能为负数`);
-  }
-  return {
-    quantityTotal,
-    expectedTotal: totalCount,
-    isQuantityValid: issues.length === 0,
-    issues
-  };
-}
-
-function directiveQuantityTotal(directives: Array<{ quantity: number }>) {
-  return directives.reduce((sum, directive) => sum + directive.quantity, 0);
-}
-
-async function syncEditableSamplingPlanTotal(tx: Prisma.TransactionClient, runId: string, planId: string) {
-  const directives = await tx.audienceSamplingDirective.findMany({
-    where: { planId },
-    select: { quantity: true }
-  });
-  const quantityTotal = directiveQuantityTotal(directives);
-  await tx.audienceSamplingPlan.update({
-    where: { id: planId },
-    data: {
-      ...(quantityTotal > 0 ? { totalCount: quantityTotal } : {})
-    }
-  });
-  if (quantityTotal > 0) {
-    await tx.testRun.update({ where: { id: runId }, data: { audienceCount: quantityTotal } });
-  }
-}
-
-function directiveToProviderView(directive: {
-  id: string;
-  sortOrder: number;
-  name: string;
-  description: string;
-  quantity: number;
-  diversityAxesJson: unknown;
-  rationale: string;
-  expansionStatus?: string | null;
-  expansionError?: string | null;
-}): AudienceSamplingDirectiveView {
-  return {
-    id: directive.id,
-    sortOrder: directive.sortOrder,
-    name: directive.name,
-    description: directive.description,
-    quantity: directive.quantity,
-    diversityAxes: jsonStringArray(directive.diversityAxesJson),
-    rationale: directive.rationale,
-    expansionStatus: directive.expansionStatus ?? undefined,
-    expansionError: directive.expansionError ?? null
-  };
-}
-
-function validateAudienceSamplingPlanDraft(plan: AudienceSamplingPlanDraft, count: number) {
-  if (!plan || typeof plan !== "object") throw new Error("AUDIENCE_PLAN_FAILED: provider did not return a plan object.");
-  if (plan.totalCount !== count) throw new Error("AUDIENCE_PLAN_FAILED: totalCount must match requested audience count.");
-  if (!Array.isArray(plan.directives) || plan.directives.length === 0) throw new Error("AUDIENCE_PLAN_FAILED: directives must be non-empty.");
-  const total = plan.directives.reduce((sum, directive) => sum + Number(directive.quantity ?? 0), 0);
-  if (total !== count) throw new Error("AUDIENCE_PLAN_FAILED: directive quantities must match requested audience count.");
-  for (const directive of plan.directives) {
-    if (!directive.name?.trim() || !directive.description?.trim() || !directive.rationale?.trim()) {
-      throw new Error("AUDIENCE_PLAN_FAILED: directive fields are incomplete.");
-    }
-    if (!Array.isArray(directive.diversityAxes) || !directive.diversityAxes.length) {
-      throw new Error("AUDIENCE_PLAN_FAILED: directive diversityAxes must be non-empty.");
-    }
-  }
-}
-
 function normalizeRunLogLimit(value: number | undefined) {
   if (value === undefined || !Number.isFinite(value)) return 50;
   return Math.min(Math.max(Math.trunc(value), 1), 200);
@@ -2798,144 +2435,8 @@ function decodeOffsetCursor(value?: string | null): number {
   }
 }
 
-function jsonStringArray(value: unknown) {
-  if (!Array.isArray(value)) return [];
-  return value.filter((item): item is string => typeof item === "string" && item.trim().length > 0);
-}
-
 function cleanStrings(value: unknown) {
   return jsonStringArray(Array.isArray(value) ? value : []);
-}
-
-async function linkContentVersionImages(tx: Prisma.TransactionClient, contentVersionId: string, imageUrls: string[]) {
-  for (const [index, url] of imageUrls.entries()) {
-    const asset = await ensureAssetForUrl(tx, url);
-    await tx.contentVersionImage.create({
-      data: {
-        contentVersionId,
-        assetId: asset.id,
-        url,
-        sortOrder: index
-      }
-    });
-  }
-}
-
-async function ensureAssetForUrl(tx: Prisma.TransactionClient, url: string) {
-  const local = localStorageKeyFromUrl(url);
-  return tx.asset.upsert({
-    where: { url },
-    create: {
-      url,
-      storage: local ? "local" : "external",
-      storageKey: local
-    },
-    update: {}
-  });
-}
-
-function normalizeStoredImageUrls(imageUrlsJson: unknown, coverImageUrl?: string | null) {
-  const urls = Array.isArray(imageUrlsJson)
-    ? imageUrlsJson.filter((item): item is string => typeof item === "string" && item.trim().length > 0)
-    : [];
-  if (coverImageUrl && !urls.includes(coverImageUrl)) urls.unshift(coverImageUrl);
-  return [...new Set(urls)];
-}
-
-function unique(values: string[]) {
-  return [...new Set(values)];
-}
-
-function isString(value: unknown): value is string {
-  return typeof value === "string" && value.trim().length > 0;
-}
-
-function objectRecord(value: unknown): Record<string, unknown> {
-  return value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : {};
-}
-
-function normalizeDemographics(value: unknown): AudienceProfileView["demographicsJson"] {
-  const record = objectRecord(value);
-  return {
-    gender: isString(record.gender) ? record.gender : "不限定",
-    ageRange: isString(record.ageRange) ? record.ageRange : "不限定",
-    cityTier: isString(record.cityTier) ? record.cityTier : "不限定",
-    lifeStage: isString(record.lifeStage) ? record.lifeStage : "不限定",
-    role: isString(record.role) ? record.role : "不限定",
-    spendingPower: isString(record.spendingPower) ? record.spendingPower : "不限定"
-  };
-}
-
-const VALID_MBTI_TYPES = new Set(["INTJ", "INTP", "ENTJ", "ENTP", "INFJ", "INFP", "ENFJ", "ENFP", "ISTJ", "ISFJ", "ESTJ", "ESFJ", "ISTP", "ISFP", "ESTP", "ESFP"]);
-const REQUIRED_DEMOGRAPHICS_FIELDS = ["gender", "ageRange", "cityTier", "lifeStage", "role", "spendingPower"];
-
-function normalizePersonaJson(value: unknown): AudiencePersonaJson {
-  const persona = objectRecord(value);
-  return {
-    profile: requirePersonaString(persona.profile, "profile"),
-    personality: requirePersonaString(persona.personality, "personality"),
-    mbtiType: requireMbtiType(persona.mbtiType) as AudiencePersonaJson["mbtiType"],
-    responseStyle: requirePersonaString(persona.responseStyle, "responseStyle")
-  };
-}
-
-function requireMbtiType(value: unknown): string {
-  const raw = typeof value === "string" ? value.trim().toUpperCase() : "";
-  if (!VALID_MBTI_TYPES.has(raw)) {
-    throw new Error(`AUDIENCE_GENERATION_FAILED: persona.mbtiType must be one of 16 MBTI types, received "${value}".`);
-  }
-  return raw;
-}
-
-function requirePersonaString(value: unknown, field: string): string {
-  if (typeof value !== "string" || !value.trim()) {
-    throw new Error(`AUDIENCE_GENERATION_FAILED: persona.${field} must be a non-empty string.`);
-  }
-  return value.trim();
-}
-
-function jsonInputOrEmpty(value: unknown): Prisma.InputJsonValue {
-  if (value === null || value === undefined) return {};
-  return value as Prisma.InputJsonValue;
-}
-
-function profileSnapshot(profile: {
-  id: string;
-  samplingPlanId: string | null;
-  samplingDirectiveId: string | null;
-  samplingLabel: string;
-  demographicsJson: unknown;
-}) {
-  return {
-    profileId: profile.id,
-    samplingPlanId: profile.samplingPlanId,
-    samplingDirectiveId: profile.samplingDirectiveId,
-    samplingLabel: profile.samplingLabel,
-    demographicsJson: profile.demographicsJson
-  };
-}
-
-function platformAccountSnapshot(platformAccount: { id: string; platform: string }) {
-  return {
-    platformAccountId: platformAccount.id,
-    platform: platformAccount.platform
-  };
-}
-
-function profileIdentityIds(profile: { generatedUserId: string | null; generatedAgentId: string | null; generatedPlatformAccountId: string | null }) {
-  return {
-    userIds: profile.generatedUserId ? [profile.generatedUserId] : [],
-    agentIds: profile.generatedAgentId ? [profile.generatedAgentId] : [],
-    platformAccountIds: profile.generatedPlatformAccountId ? [profile.generatedPlatformAccountId] : []
-  };
-}
-
-function shouldDeleteAgentIdentity(agent: { retentionPolicy: string; favoritedAt: Date | null }) {
-  return agent.retentionPolicy === "delete_with_origin_run" && !agent.favoritedAt;
-}
-
-function hasCompleteProfileIdentity(profile: { generatedUserId: string | null; generatedAgentId: string | null; generatedPlatformAccountId: string | null }) {
-  return Boolean(profile.generatedUserId && profile.generatedAgentId && profile.generatedPlatformAccountId);
 }
 
 async function compensateProfilesForAudienceGenerationJob(tx: Prisma.TransactionClient, job: { id: string; runId: string }, message: string) {
