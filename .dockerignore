@@ -47,6 +47,11 @@ coverage
 .claude-tmp
 .playwright-mcp
 
+# 上传目录：默认过滤所有上传文件，只保留 demo seed 图片
+# 防止本地开发时上传的测试/用户文件进入公开镜像
+apps/api/uploads/*
+!apps/api/uploads/demo-trycue-*
+
 # 临时文件
 *.log
 tmp
