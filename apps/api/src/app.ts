@@ -155,18 +155,15 @@ export async function buildApp(config: AppConfig) {
   app.get("/health", async () => ok({ status: "ok" }));
 
   // ── Write-operation auth (optional token) ──
-  // 当 config.apiAuthToken 设置时，所有写操作必须带 X-TryCue-Token 头匹配。
-  // 放行的读路径：GET /health（健康检查）、GET /uploads/*（静态资源）、
-  // GET /api/runs/:runId/events（SSE — EventSource API 不支持自定义 header）。
+  // 当 config.apiAuthToken 设置时，所有写操作（POST/PUT/PATCH/DELETE）必须带 X-TryCue-Token 头匹配。
+  // GET 请求全部放行：SPA 静态资源（/、/assets/*）、/health、/uploads/*、SSE（EventSource 不支持自定义 header）、
+  // 以及所有 GET /api/* 读操作（前端 fetch GET 不带 token）。
   // 未设置 token 时跳过鉴权，依赖 host=127.0.0.1 的网络层约束。
   if (config.apiAuthToken) {
     const expectedToken = config.apiAuthToken;
     app.addHook("onRequest", async (request, reply) => {
-      const path = request.url.split("?")[0] ?? request.url;
-      // 健康检查、静态资源、SSE 读路径放行
-      if (path === "/health"
-        || path.startsWith("/uploads/")
-        || (path.startsWith("/api/runs/") && path.endsWith("/events"))) return;
+      // GET 请求全部放行（静态资源、SSE、读 API）
+      if (request.method === "GET") return;
       const provided = request.headers["x-trycue-token"];
       const providedStr = Array.isArray(provided) ? provided[0] : provided;
       // 用恒定时间比较防止 timing attack
