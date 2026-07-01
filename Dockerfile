@@ -52,7 +52,7 @@ ENV WEB_DIST_PATH=/app/apps/web/dist
 ENV ENABLE_SCHEDULER=true
 ENV ENABLE_REPORT_GENERATION=true
 ENV LOG_LEVEL=info
-ENV API_PORT=4000
+ENV API_PORT=2671
 # 容器内必须绑 0.0.0.0 才能被宿主机端口映射访问。
 # 暴露到公网时务必在 docker-compose.yml 或 docker run -e 设置 API_AUTH_TOKEN。
 ENV API_HOST=0.0.0.0

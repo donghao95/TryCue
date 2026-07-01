@@ -15,7 +15,7 @@ REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$REPO_ROOT"
 
 TAG="latest"
-PORT=4000
+PORT=2671
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
