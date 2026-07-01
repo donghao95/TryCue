@@ -73,11 +73,13 @@ try {
 
     if (hasLegacyMigrations || (userTableCount.count > 0 && !appliedNames.includes("0001_baseline")) || hasCorruptBaseline) {
       // Destructive baseline reset is only allowed for local dev/test databases.
-      // This script is intended for local dev/test only; production must use
-      // `prisma migrate deploy`, which never drops tables. Fail-closed: block
-      // both explicit production envs and unknown databases (the root db:*
-      // scripts don't set NODE_ENV, so we also gate on DATABASE_URL matching
-      // the project's dev/test naming convention, mirroring the test helper
+      // This script is used in both local dev/test and Docker production (Dockerfile CMD).
+      // In Docker production (NODE_ENV=production), the fail-closed guard below blocks
+      // any destructive reset. prisma CLI is a devDependency, so `prisma migrate deploy`
+      // is not available in the runner image; this script is the sole migration path.
+      // Fail-closed: block both explicit production envs and unknown databases
+      // (the root db:* scripts don't set NODE_ENV, so we also gate on DATABASE_URL
+      // matching the project's dev/test naming convention, mirroring the test helper
       // in apps/api/src/tests/helpers.ts).
       const nodeEnv = process.env.NODE_ENV;
       // 精确匹配已知的本地开发/测试库文件名，避免 `trycue_prod.db`、

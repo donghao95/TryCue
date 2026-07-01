@@ -32,8 +32,40 @@ COPY . .
 RUN pnpm db:generate
 RUN pnpm build
 
-# ─── Stage 2: Runtime ───
-# 直接复用 builder 整个目录（含 node_modules、已编译的 better-sqlite3 native binding、已生成的 Prisma client）
+# ─── Stage 2: Prod deps ───
+# 独立阶段只装 prod 依赖，避免 .pnpm store 保留 dev 依赖导致 runner 镜像膨胀。
+# better-sqlite3 在此阶段重新编译 native binding（builder 的编译工具链不跨阶段）。
+FROM node:24-slim AS prod-deps
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    python3 \
+    make \
+    g++ \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN corepack enable
+
+WORKDIR /app
+
+COPY pnpm-lock.yaml pnpm-workspace.yaml package.json ./
+COPY apps/api/package.json apps/api/
+COPY apps/web/package.json apps/web/
+COPY packages/db/package.json packages/db/
+COPY packages/shared/package.json packages/shared/
+# prisma schema 生成 client 时需要
+COPY packages/db/prisma/schema.prisma packages/db/prisma/schema.prisma
+
+# 只装 prod 依赖（不含 typescript/tsx/vite/@types/* 等 dev 依赖）
+RUN pnpm install --prod --frozen-lockfile
+
+# 生成 Prisma client（runner 需要 @prisma/client 的 query engine binary）。
+# prisma CLI 是 devDependency，--prod 不装，用 npx 临时下载来生成。
+# 权衡：npx 绕过 lockfile，版本固定为 6.19.3（与 @prisma/client 一致），
+# 但不享受 lockfile 的完整性校验和离线缓存。如果 npm registry 不可用构建会失败。
+# 替代方案是从 builder 阶段复制已生成的 node_modules/.prisma/client，但会引入 builder 的依赖残留。
+RUN npx --yes prisma@6.19.3 generate --schema packages/db/prisma/schema.prisma
+
+# ─── Stage 3: Runtime ───
 FROM node:24-slim AS runner
 
 # 安装 openssl（Prisma query engine 依赖）+ ca-certificates（HTTPS 请求需要）
@@ -57,11 +89,23 @@ ENV API_PORT=2671
 # 暴露到公网时务必在 docker-compose.yml 或 docker run -e 设置 API_AUTH_TOKEN。
 ENV API_HOST=0.0.0.0
 
-# 从 builder 复制整个构建产物（含 node_modules、dist、prisma client、better-sqlite3 编译产物）
-COPY --from=builder /app .
+# 从 prod-deps 复制整个 /app：
+# - 根 node_modules（含 .pnpm store，实际依赖文件）
+# - 各 workspace 包的 node_modules（符号链接，指向 .pnpm store）
+# - package.json 们 + pnpm-workspace.yaml + schema.prisma
+# pnpm workspace 的包依赖通过 packages/*/node_modules 符号链接解析，
+# 只复制根 node_modules 会丢失这些链接，导致 ERR_MODULE_NOT_FOUND。
+COPY --from=prod-deps /app .
 
-# 在 runner 环境重新生成 Prisma client（确保 query engine binary 匹配运行时 openssl 版本）
-RUN cd packages/db && npx prisma generate --schema prisma/schema.prisma
+# 从 builder 复制构建产物和运行时必需的资源（覆盖 prod-deps 的空目录）
+COPY --from=builder /app/apps/api/dist ./apps/api/dist
+COPY --from=builder /app/apps/api/uploads ./apps/api/uploads
+COPY --from=builder /app/apps/web/dist ./apps/web/dist
+COPY --from=builder /app/packages/db/dist ./packages/db/dist
+# migrations 目录只在 builder 有（prod-deps 只复制了 schema.prisma）
+COPY --from=builder /app/packages/db/prisma ./packages/db/prisma
+COPY --from=builder /app/packages/shared/dist ./packages/shared/dist
+COPY --from=builder /app/config/llm.example.yaml ./config/
 
 # 拷贝默认配置模板（用户可通过 volume 覆盖）
 RUN cp config/llm.example.yaml config/llm.local.yaml
