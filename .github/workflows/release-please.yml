@@ -13,7 +13,7 @@ jobs:
   release-please:
     runs-on: ubuntu-latest
     steps:
-      - uses: googleapis/release-please-action@v4
+      - uses: googleapis/release-please-action@v5
         with:
           # 单一 release：所有包作为一个整体发版，不拆分为 @trycue/api、@trycue/web 等
           # 因为所有包都是 private，不会发布到 npm，release-please 只负责：
