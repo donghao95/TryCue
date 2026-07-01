@@ -44,8 +44,14 @@ jobs:
       - name: Test
         run: pnpm test
 
-      - name: Integration test
-        run: pnpm test:integration
+      # PR CI 只跑 smoke 集成测试（5 个关键路径用例），不跑完整 test:integration。
+      # 原因：GitHub runner 跑不动 SQLite + 高并发 audience generation + 完整 93 个
+      # 集成测试的组合，会大面积 Socket timeout / Timed out waiting for condition。
+      # 该结论由 PR14 验证并固化，完整 integration 留给本地 `pnpm verify` 和未来
+      # 可能的 nightly workflow。如需改回完整 integration，请先确认 runner 规格和
+      # 超时配置能承载，避免重蹈 2eb6428 把 smoke 改回 full 后 CI 立即全红的覆辙。
+      - name: Smoke integration test
+        run: pnpm test:integration:smoke
 
       - name: Build
         run: pnpm build
