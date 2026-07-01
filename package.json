@@ -35,8 +35,8 @@
     "test:integration:smoke": "cross-env DATABASE_URL=file:./data/trycue_test.db pnpm --filter @trycue/db db:deploy && cross-env NODE_ENV=test DATABASE_URL=file:./data/trycue_test.db pnpm --filter @trycue/api test:integration:smoke",
     "verify": "pnpm db:generate && pnpm lint && pnpm typecheck && pnpm test && pnpm test:integration && pnpm build",
     "db:generate": "pnpm --filter @trycue/db db:generate",
-    "db:migrate": "cross-env DATABASE_URL=file:./data/trycue.db pnpm --filter @trycue/db db:migrate",
-    "db:deploy": "cross-env DATABASE_URL=file:./data/trycue.db pnpm --filter @trycue/db db:deploy",
+    "db:migrate": "pnpm --filter @trycue/db db:migrate",
+    "db:deploy": "pnpm --filter @trycue/db db:deploy",
     "db:seed-demo": "pnpm --filter @trycue/db db:seed-demo"
   },
   "devDependencies": {

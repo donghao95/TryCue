@@ -22,3 +22,7 @@ jobs:
           release-type: node
           # 不在 tag 里包含组件名（@trycue/api-v0.1.0 → v0.1.0）
           include-component-in-tag: false
+          # 用 PAT 而非默认 GITHUB_TOKEN：GITHUB_TOKEN 创建的 tag 不会触发其他 workflow
+          # （GitHub 防递归规则），导致 docker.yml 监听的 push.tags:v* 永远不触发。
+          # PAT 创建的 tag 能正常触发 docker 镜像构建。
+          token: ${{ secrets.GH_PAT }}

@@ -4,10 +4,10 @@ import { join, resolve, dirname } from "node:path";
 import { createHash, randomUUID } from "node:crypto";
 import Database from "better-sqlite3";
 
-const databaseUrl = process.env.DATABASE_URL;
-if (!databaseUrl) {
-  throw new Error("DATABASE_URL is required to apply migrations.");
-}
+// DATABASE_URL 通过 env.ts 从 .env.local / .env 加载。
+// 未设置时回退到默认开发库（与 .env.example 一致），避免没建 .env.local 时崩溃。
+// test:integration 脚本会用 cross-env 显式覆盖为 trycue_test.db，不受影响。
+const databaseUrl = process.env.DATABASE_URL ?? "file:./data/trycue.db";
 
 // Parse file: URL → absolute path
 // file:./data/trycue.db → resolve relative to workspace root
