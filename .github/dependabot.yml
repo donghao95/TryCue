@@ -19,10 +19,6 @@ updates:
       types:
         patterns:
           - "@types/*"
-      # 把 @trycue 内部 workspace 依赖单独分组（通常跟随本地版本）
-      trycue:
-        patterns:
-          - "@trycue/*"
       # 把 prisma 相关依赖打包（@prisma/client 和 prisma 版本需保持一致）
       prisma:
         patterns:
