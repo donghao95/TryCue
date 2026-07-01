@@ -1378,17 +1378,25 @@ export class RunService {
     const run = await prisma.testRun.findUnique({ where: { id: runId } });
     if (!run) throw new ApiError("RUN_NOT_FOUND", "试映任务不存在", 404);
     this.assertAudienceEditableRun(run.status);
+    // 冲突检测放在事务外，避免 BEGIN IMMEDIATE 与首个确认请求后台任务的写锁冲突。
+    // 背景：首个确认成功后会 fire-and-forget 启动 runAudienceGenerationJob 后台任务，
+    // 它持续写入 testRun/plan/job 表，且在进程内锁释放后仍在执行。第二个并发请求
+    // 获取锁后若进入 prisma.$transaction，BEGIN IMMEDIATE 会撞上后台任务的 SQLite
+    // 写锁，Prisma 抛出非 ApiError 错误导致返回 500（应为 409）。
+    // 事务外的只读查询不获取写锁；事务内保留 updateMany 乐观锁作为最终一致性保障。
+    const activeJob = await prisma.audienceGenerationJob.findFirst({
+      where: { runId, active: true, status: { in: activeAudienceGenerationJobStatuses } }
+    });
+    if (activeJob) throw new ApiError("AUDIENCE_GENERATION_ACTIVE", "观众生成任务仍在执行，请等待完成或取消后再开始试映", 409, jobView(activeJob));
+    const plan = await prisma.audienceSamplingPlan.findUnique({ where: { runId }, include: { directives: true } });
+    if (!plan) throw new ApiError("AUDIENCE_PLAN_REQUIRED", "需要先生成观众采样计划", 409);
+    if (plan.status !== "ready_for_review") throw new ApiError("INVALID_PLAN_STATUS", "只有待确认的观众计划可以确认", 409);
+    const quantityTotal = directiveQuantityTotal(plan.directives);
+    const validation = samplingPlanValidation(quantityTotal ?? plan.totalCount, plan.directives);
+    if (!validation.isQuantityValid || plan.directives.length === 0) throw new ApiError("AUDIENCE_PLAN_INVALID", "人群计划数量不合法", 400, validation);
     const job = await prisma.$transaction(async (tx) => {
-      const activeJob = await tx.audienceGenerationJob.findFirst({
-        where: { runId, active: true, status: { in: activeAudienceGenerationJobStatuses } }
-      });
-      if (activeJob) throw new ApiError("AUDIENCE_GENERATION_ACTIVE", "观众生成任务仍在执行，请等待完成或取消后再开始试映", 409, jobView(activeJob));
-      const plan = await tx.audienceSamplingPlan.findUnique({ where: { runId }, include: { directives: true } });
-      if (!plan) throw new ApiError("AUDIENCE_PLAN_REQUIRED", "需要先生成观众采样计划", 409);
-      if (plan.status !== "ready_for_review") throw new ApiError("INVALID_PLAN_STATUS", "只有待确认的观众计划可以确认", 409);
-      const quantityTotal = directiveQuantityTotal(plan.directives);
-      const validation = samplingPlanValidation(quantityTotal ?? plan.totalCount, plan.directives);
-      if (!validation.isQuantityValid || plan.directives.length === 0) throw new ApiError("AUDIENCE_PLAN_INVALID", "人群计划数量不合法", 400, validation);
+      // 乐观锁：若事务外读取后、事务提交前 plan.status 被另一个确认改掉，
+      // updateMany 匹配 0 行，抛 409。
       const confirmed = await tx.audienceSamplingPlan.updateMany({
         where: { id: plan.id, status: "ready_for_review" },
         data: {
