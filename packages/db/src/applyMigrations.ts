@@ -80,7 +80,11 @@ try {
       // the project's dev/test naming convention, mirroring the test helper
       // in apps/api/src/tests/helpers.ts).
       const nodeEnv = process.env.NODE_ENV;
-      const isKnownDevOrTestDb = databaseUrl.includes("trycue");
+      // 精确匹配已知的本地开发/测试库文件名，避免 `trycue_prod.db`、
+      // `trycue_staging.db` 等含 "trycue" 子串的非 dev 库被误判为可重置。
+      const isKnownDevOrTestDb =
+        databaseUrl.includes("trycue.db") ||
+        databaseUrl.includes("trycue_test.db");
       if (nodeEnv === "production" || !isKnownDevOrTestDb) {
         throw new Error(
           "Refusing to drop tables outside local dev/test. Use `prisma migrate deploy` in production."

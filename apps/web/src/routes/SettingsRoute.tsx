@@ -441,7 +441,7 @@ export function SettingsRoute({ onHome, registerNavigationGuard }: { onHome: () 
                 {apiKeyDirty ? <span className="fieldDirtyTag">{t("settings.model.apiKeyModified")}</span> : null}
               </span>
               <input
-                type="text"
+                type="password"
                 autoComplete="off"
                 value={apiKeyInput}
                 placeholder={settings.apiKeyMasked || "sk-..."}

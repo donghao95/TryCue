@@ -49,7 +49,9 @@ export function settingsRoutes(deps: SettingsRoutesDeps): FastifyPluginAsync {
   return async (app) => {
     app.get("/api/settings/llm", async () => ok(llmConfigStore.view()));
 
-    app.put("/api/settings/llm", async (request, reply) => {
+    // LLM 配置写入 + 容量探测 + 模型列表获取都触发外部调用或敏感写入，
+    // 收紧到 10 req/分钟防止滥用。
+    app.put("/api/settings/llm", { config: { rateLimit: { max: 10, timeWindow: "1 minute" } } }, async (request, reply) => {
       try {
         const parsed = LlmSettingsRequestSchema.safeParse(request.body);
         if (!parsed.success) throw new ApiError("VALIDATION_ERROR", "参数错误", 400, parsed.error.flatten());
@@ -68,7 +70,7 @@ export function settingsRoutes(deps: SettingsRoutesDeps): FastifyPluginAsync {
       return ok(getSharedCapacityManager().getStatus());
     });
 
-    app.post("/api/settings/llm/capacity/probe", async (request, reply) => {
+    app.post("/api/settings/llm/capacity/probe", { config: { rateLimit: { max: 5, timeWindow: "1 minute" } } }, async (request, reply) => {
       try {
         const parsed = LlmCapacityProbeRequestSchema.safeParse(request.body ?? {});
         if (!parsed.success) throw new ApiError("VALIDATION_ERROR", "参数错误", 400, parsed.error.flatten());
@@ -148,7 +150,7 @@ export function settingsRoutes(deps: SettingsRoutesDeps): FastifyPluginAsync {
       }
     });
 
-    app.post("/api/settings/llm/models", async (request, reply) => {
+    app.post("/api/settings/llm/models", { config: { rateLimit: { max: 10, timeWindow: "1 minute" } } }, async (request, reply) => {
       try {
         const parsed = ListModelsRequestSchema.safeParse(request.body ?? {});
         if (!parsed.success) throw new ApiError("VALIDATION_ERROR", "参数错误", 400, parsed.error.flatten());

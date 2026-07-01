@@ -1117,7 +1117,7 @@ data: {"eventId":"42","runId":"run_001",...}
 
 #### 事件类型完整清单
 
-当前 `LiveEventType` 必须与 `packages/shared/src/index.ts` 保持一致：
+当前 `LiveEventType` 必须与 `packages/shared/src/live-events.ts` 保持一致：
 
 ```text
 post_state.updated
@@ -1158,6 +1158,7 @@ run.paused
 run.resumed
 run.completed
 run_log.created
+report.regenerated
 ```
 
 #### 断线重连机制

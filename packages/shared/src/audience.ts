@@ -143,7 +143,8 @@ export const AudienceSamplingDirectiveSchema = z.object({
   sortOrder: z.number().int().min(0),
   name: z.string().trim().min(1).max(80),
   description: z.string().trim().min(1).max(1000),
-  quantity: z.number().int().min(0).max(1000),
+  // docs/04 明确 directive.quantity 全部为正整数，与 CreateRequestSchema 的 min(1) 一致。
+  quantity: z.number().int().min(1).max(1000),
   diversityAxes: z.array(z.string().trim().min(1).max(120)).min(1).max(20),
   rationale: z.string().trim().min(1).max(1000),
   groupRole: AudienceGroupRoleSchema.default("unknown"),

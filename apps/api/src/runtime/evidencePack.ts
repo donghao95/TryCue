@@ -1177,12 +1177,12 @@ function buildAudienceGroups(facts: Map<string, ParticipantFacts>, input: Eviden
 
   const coreTargetHit = coreGroups.some((g) => g.total > 0 && g.opened / g.total >= 0.5);
   // core_target 中 interested_but_not_convinced 人数 >= 2
+  // 注意：外层不能遍历 coreGroups，否则同一 fact 会被按 core_target directive 数量重复计数。
+  // 直接遍历 facts，每个 fact 只计一次。
   let coreInterestedLowTrust = 0;
-  for (const _g of coreGroups) {
-    for (const f of facts.values()) {
-      if (f.directiveId && input.directives.some((d) => d.id === f.directiveId && d.groupRole === "core_target")) {
-        if (f.segments.includes("interested_but_not_convinced")) coreInterestedLowTrust++;
-      }
+  for (const f of facts.values()) {
+    if (f.directiveId && input.directives.some((d) => d.id === f.directiveId && d.groupRole === "core_target")) {
+      if (f.segments.includes("interested_but_not_convinced")) coreInterestedLowTrust++;
     }
   }
   const coreTargetHighInterestLowTrust = coreInterestedLowTrust >= 2;

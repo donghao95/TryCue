@@ -91,7 +91,8 @@ export const LlmSettingsRequestSchema = z.object({
   runtimeMode: LlmRuntimeModeSchema,
   apiKey: z.string().trim().optional(),
   clearApiKey: z.boolean().optional().default(false),
-  baseUrl: z.string().trim().optional(),
+  // baseUrl 只支持 http/https scheme（docs/02 明确要求），防止 javascript:/file: 等危险 scheme。
+  baseUrl: z.string().trim().regex(/^https?:\/\/.+/i, "baseUrl 必须使用 http 或 https 协议").optional(),
   models: z.object({
     fast: z.string().trim().optional(),
     pro: z.string().trim().optional()
@@ -102,8 +103,8 @@ export type LlmSettingsRequest = z.infer<typeof LlmSettingsRequestSchema>;
 
 export const ListModelsRequestSchema = z.object({
   apiKey: z.string().trim().optional(),
-  baseUrl: z.string().trim().optional()
-});
+  baseUrl: z.string().trim().regex(/^https?:\/\/.+/i, "baseUrl 必须使用 http 或 https 协议").optional()
+}).strict();
 export type ListModelsRequest = z.infer<typeof ListModelsRequestSchema>;
 
 export type LlmSettingsView = {
@@ -151,7 +152,7 @@ export const LlmCapacityProbeRequestSchema = z.object({
   maxConcurrency: z.number().int().positive().optional(),
   model: z.string().trim().optional(),
   apiKey: z.string().trim().optional(),
-  baseUrl: z.string().trim().optional()
+  baseUrl: z.string().trim().regex(/^https?:\/\/.+/i, "baseUrl 必须使用 http 或 https 协议").optional()
 }).strict();
 export type LlmCapacityProbeRequest = z.infer<typeof LlmCapacityProbeRequestSchema>;
 

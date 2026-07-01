@@ -1,6 +1,7 @@
 import type { FastifyReply, FastifyRequest } from "fastify";
 import { ok } from "@trycue/shared/api";
 import { ApiError, sendApiError } from "../errors.js";
+import type { ZodType } from "zod";
 
 /**
  * Extract and validate `runId` from route params.
@@ -10,6 +11,19 @@ export function getRunId(params: unknown): string {
   const value = (params as { runId?: string }).runId;
   if (!value) throw new ApiError("RUN_NOT_FOUND", "试映任务不存在", 404);
   return value;
+}
+
+/**
+ * 用 Zod schema 校验请求 body，失败时抛 VALIDATION_ERROR (400)。
+ * 用于 route 层替代 `request.body as { ... }` 类型断言。
+ */
+export function parseBody<T>(schema: ZodType<T>, body: unknown): T {
+  const result = schema.safeParse(body);
+  if (!result.success) {
+    const issues = result.error.issues.map((i) => `${i.path.join(".")}: ${i.message}`).join("; ");
+    throw new ApiError("VALIDATION_ERROR", `请求参数校验失败：${issues}`, 400, result.error.issues);
+  }
+  return result.data;
 }
 
 /**

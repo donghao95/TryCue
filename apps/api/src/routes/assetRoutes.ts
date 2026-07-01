@@ -34,7 +34,7 @@ export interface AssetRoutesDeps {
 export function assetRoutes(deps: AssetRoutesDeps): FastifyPluginAsync {
   const { uploadDir, maxCoverImageSizeMb } = deps;
   return async (app) => {
-    app.post("/api/upload", async (request, reply) => {
+    app.post("/api/upload", { config: { rateLimit: { max: 20, timeWindow: "1 minute" } } }, async (request, reply) => {
       try {
         const file = await request.file();
         if (!file) throw new ApiError("VALIDATION_ERROR", "文件缺失", 400);

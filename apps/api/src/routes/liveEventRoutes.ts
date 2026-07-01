@@ -56,17 +56,18 @@ export function liveEventRoutes(deps: LiveEventRoutesDeps): FastifyPluginAsync {
       const afterSequence = Array.isArray(lastEventId)
         ? lastEventId[0] || (typeof queryAfter === "string" ? queryAfter : undefined)
         : lastEventId || (typeof queryAfter === "string" ? queryAfter : undefined);
+      // 先拉取历史事件再写 headers，避免 listLiveEvents 抛错时留下半开 SSE 连接。
+      // 若历史拉取失败，走标准错误处理返回 500。
+      const shouldReplay = !liveOnly || afterSequence !== undefined;
+      const history = shouldReplay ? await listLiveEvents(runId, afterSequence) : [];
       reply.raw.writeHead(200, {
         "Content-Type": "text/event-stream",
         "Cache-Control": "no-cache",
         Connection: "keep-alive",
         "X-Accel-Buffering": "no"
       });
-      const shouldReplay = !liveOnly || afterSequence !== undefined;
-      if (shouldReplay) {
-        for (const event of await listLiveEvents(runId, afterSequence)) {
-          reply.raw.write(encodeSse(event));
-        }
+      for (const event of history) {
+        reply.raw.write(encodeSse(event));
       }
       let destroyed = false;
       const safeWrite = (data: string) => {

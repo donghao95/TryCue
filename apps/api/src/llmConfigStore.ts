@@ -1,4 +1,4 @@
-import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
+import { chmod, mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import { parse, stringify } from "yaml";
 import { z } from "zod";
@@ -151,6 +151,9 @@ export class LlmConfigStore {
       capacity: config.capacity
     });
     await writeFile(tmpPath, content, "utf8");
+    // 文件含明文 apiKey，限制为仅当前用户可读写（0o600）。
+    // Windows 忽略 mode 参数，Linux/macOS 生效。
+    await chmod(tmpPath, 0o600);
     await rename(tmpPath, this.filePath);
   }
 }
