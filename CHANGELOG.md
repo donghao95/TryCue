@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.1.2](https://github.com/donghao95/TryCue/compare/v0.1.1...v0.1.2) (2026-07-01)
+
+
+### Bug Fixes
+
+* **api:** move audience plan confirm conflict checks outside transaction ([#33](https://github.com/donghao95/TryCue/issues/33)) ([32be028](https://github.com/donghao95/TryCue/commit/32be0280fe0355827a212bcfb0526c87103f3561))
+
+
+### Performance Improvements
+
+* **docker:** slim runner image via 3-stage build ([#36](https://github.com/donghao95/TryCue/issues/36)) ([edc7537](https://github.com/donghao95/TryCue/commit/edc7537e4e5a0b1aa6df03a5ed4e1654f279bb31))
+
 ## 0.1.1 (2026-07-01)
 
 
