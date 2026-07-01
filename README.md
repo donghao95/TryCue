@@ -52,27 +52,69 @@ docs/assets/screenshot-report.png      试映报告
 
 ## 快速开始
 
-TryCue 默认支持 mock 模式，本地启动不需要真实 LLM API Key。
+TryCue 默认支持 mock 模式，无需真实 LLM API Key 即可体验。
+
+### 方式一：Docker（推荐，零依赖）
+
+适合只想快速体验的普通用户。只需安装 Docker。
+
+**Windows / PowerShell：**
+
+```powershell
+.\scripts\docker-run.ps1
+```
+
+**macOS / Linux：**
+
+```bash
+chmod +x scripts/docker-run.sh
+./scripts/docker-run.sh
+```
+
+脚本会自动拉取镜像、创建数据目录和配置模板，并启动容器。启动完成后访问 http://localhost:4000
+
+或手动启动：
+
+```bash
+cp config/llm.example.yaml config/llm.local.yaml
+docker compose up -d
+```
+
+### 方式二：本地开发
+
+适合想阅读源码、二次开发的开发者。需要 Node.js 24+ 和 pnpm 10.4.0。
+
+**Windows / PowerShell：**
+
+```powershell
+pnpm install
+powershell -ExecutionPolicy Bypass -File ./scripts/run-local.ps1
+```
+
+**macOS / Linux：**
 
 ```bash
 pnpm install
-cp .env.example .env.local
-cp config/llm.example.yaml config/llm.local.yaml
-pnpm dev:local
+chmod +x scripts/run-local.sh
+./scripts/run-local.sh
 ```
 
-Windows / PowerShell 可以手动复制：
+启动后访问终端输出的本地地址，通常是 http://localhost:3000
 
-```text
-.env.example -> .env.local
-config/llm.example.yaml -> config/llm.local.yaml
+### 切换到 real 模式
+
+mock 模式用于快速体验。要使用真实 LLM 生成更丰富的观众行为，编辑 `config/llm.local.yaml`：
+
+```yaml
+runtimeMode: real
+apiKey: "your-api-key"
+baseUrl: "https://your-llm-endpoint/v1"
+models:
+  fast: "model-name-fast"
+  pro: "model-name-pro"  # 需支持 vision（使用封面图时）
 ```
 
-启动后访问终端输出的本地地址，通常是：
-
-```text
-http://localhost:5173
-```
+详细配置说明见 [docs/09_部署与运维.md](docs/09_部署与运维.md)。
 
 ---
 

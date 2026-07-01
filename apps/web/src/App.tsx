@@ -1418,7 +1418,9 @@ export function App() {
     }
     const createdRunId = createResponse.data.runId;
     setRunId(createdRunId);
-    setRestoredRunId(createdRunId);
+    // 不提前 setRestoredRunId：route effect 的 guard（route.runId===runId && restoredRunId===route.runId）
+    // 会因此跳过 restoreRun，导致 overrideFromContentVersion 不执行，clearCreateDraft 清空表单后
+    // 后端 contentVersion 不会被填回，现场页左侧帖子预览空白。让 route effect 正常触发 restoreRun 拉取事实。
     clearCreateDraft();
     await navigateTo({ kind: "workbench", runId: createdRunId }, { replace: true, skipGuard: true });
     if (await startAudiencePlanGeneration(createdRunId, { targetCount: selectedAudienceCount })) {

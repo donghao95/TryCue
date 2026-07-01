@@ -1,22 +1,41 @@
-# 注意：V1 本地开发使用 SQLite（见 .env.example 的 DATABASE_URL），
-# 不需要启动本文件中的 Postgres。此文件仅为未来生产环境迁移 PostgreSQL
-# 保留的实验性配置，外部贡献者 clone 仓库后无需 docker compose up。
-services:
-  postgres:
-    image: postgres:17-alpine
-    environment:
-      POSTGRES_DB: trycue
-      POSTGRES_USER: trycue
-      POSTGRES_PASSWORD: trycue
-    ports:
-      - "5432:5432"
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U trycue -d trycue"]
-      interval: 3s
-      timeout: 3s
-      retries: 20
-    volumes:
-      - trycue-postgres:/var/lib/postgresql/data
+# TryCue Docker Compose
+#
+# 用法：
+#   1. 准备配置：cp config/llm.example.yaml config/llm.local.yaml（按需修改）
+#   2. docker compose up -d
+#   3. 访问 http://localhost:4000
+#
+# 数据持久化：./data 目录挂载到容器内 /app/data，SQLite 数据库保存在此
+# 配置覆盖：./config 目录挂载到容器内 /app/config（rw），用户在 /app/config/llm.local.yaml 改配置
+#
+# uploads 说明：镜像已内置 demo 图片（apps/api/uploads/demo-*）。
+# 如需持久化用户上传的图片，自行取消下方 uploads volume 的注释。
+#
+# 容器以 root 运行（V1 兼容 Windows Docker Desktop bind mount 的 uid 映射问题）。
+# macOS/Windows/Linux 上 bind-mounted 目录均可直接写，无需手动 chown。
+#
+# 注意：V1 本地开发也可使用 SQLite（见 .env.example 的 DATABASE_URL），不需要 Docker。
+# 此文件用于基于 GHCR 镜像的一键部署。
 
-volumes:
-  trycue-postgres:
+services:
+  trycue:
+    image: ghcr.io/donghao95/trycue:latest
+    container_name: trycue
+    ports:
+      - "4000:4000"
+    volumes:
+      # 数据持久化
+      - ./data:/app/data
+      # LLM 配置目录（rw，settings 页面写回文件用 atomic rename，必须目录挂载不能用单文件挂载）
+      - ./config:/app/config
+      # 上传图片持久化（默认注释：用镜像内置 demo 图片；如需持久化上传请取消注释）
+      # 注意：取消注释后 host ./apps/api/uploads 会覆盖镜像内的 demo 图片，需先从镜像拷出 demo 图片：
+      #   docker run --rm --entrypoint sh ghcr.io/donghao95/trycue:latest -c "tar -C /app/apps/api/uploads -cf - ." | tar -C ./apps/api/uploads -xf -
+      # - ./apps/api/uploads:/app/apps/api/uploads
+    environment:
+      - APP_URL=http://localhost:4000
+      - LOG_LEVEL=info
+      # mock 模式开箱即用；要切 real 模式在 config/llm.local.yaml 里改 runtimeMode
+      - ENABLE_SCHEDULER=true
+      - ENABLE_REPORT_GENERATION=true
+    restart: unless-stopped

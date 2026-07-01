@@ -1,5 +1,5 @@
 import { prisma, type Prisma } from "@trycue/db";
-import type { LanguageModelUsage, TelemetryIntegration, TelemetrySettings } from "ai";
+import type { LanguageModelUsage, Telemetry, TelemetryOptions } from "ai";
 import { log } from "../logger.js";
 
 export type AiSdkTraceInput = {
@@ -14,34 +14,31 @@ export type AiSdkTraceInput = {
 };
 
 export function aiSdkTrace(input: AiSdkTraceInput): {
-  experimental_telemetry?: TelemetrySettings;
+  telemetry?: TelemetryOptions;
 } {
   if (!input.runId) return {};
-  const metadata = cleanTelemetryMetadata({
-    runId: input.runId,
-    taskType: input.taskType,
-    promptVersion: input.promptVersion,
-    agentTurnId: input.agentTurnId,
-    participantId: input.participantId,
-    jobId: input.jobId,
-    profileId: input.profileId,
-    ...(input.metadata ?? {})
-  });
+  // ai@7 的 Telemetry 接口移除了 metadata 字段，调用方传入的 trace 维度
+  // （如 journeyId/stepIndex/directiveId/chunkStart/chunkCount）无法再通过
+  // telemetry metadata 传递。这里把 caller metadata 合并进 metadataJson，
+  // 保证 usage attribution 和按这些标识符调试的能力不丢失。
+  const callerMetadata = cleanTelemetryMetadata(input.metadata ?? {});
   return {
-    experimental_telemetry: {
+    telemetry: {
       isEnabled: true,
       recordInputs: false,
       recordOutputs: false,
       functionId: input.taskType,
-      metadata,
-      integrations: [createTraceIntegration(input)]
+      integrations: [createTraceIntegration(input, callerMetadata)]
     }
   };
 }
 
-function createTraceIntegration(input: Required<Pick<AiSdkTraceInput, "taskType">> & AiSdkTraceInput): TelemetryIntegration {
+function createTraceIntegration(
+  input: Required<Pick<AiSdkTraceInput, "taskType">> & AiSdkTraceInput,
+  callerMetadata: Record<string, string | number | boolean>
+): Telemetry {
   return {
-    onStepFinish: async (event) => {
+    onStepEnd: async (event) => {
       if (!input.runId) return;
       const usage = normalizeUsage(event.usage);
       try {
@@ -68,8 +65,8 @@ function createTraceIntegration(input: Required<Pick<AiSdkTraceInput, "taskType"
               noCacheInputTokens: usage.noCacheInputTokens,
               rawUsageJson: usage.rawUsageJson,
               metadataJson: cleanJson({
-                functionId: event.functionId,
-                metadata: event.metadata,
+                ...callerMetadata,
+                functionId: input.taskType,
                 toolCallCount: event.toolCalls.length,
                 finishReason: event.finishReason,
                 rawFinishReason: event.rawFinishReason
@@ -134,15 +131,6 @@ function normalizeUsage(usage: LanguageModelUsage | undefined) {
   };
 }
 
-function cleanTelemetryMetadata(input: Record<string, string | number | boolean | null | undefined>) {
-  return Object.fromEntries(
-    Object.entries(input).filter((entry): entry is [string, string | number | boolean] => {
-      const value = entry[1];
-      return typeof value === "string" || typeof value === "number" || typeof value === "boolean";
-    })
-  );
-}
-
 function cleanJson(value: unknown): unknown {
   if (Array.isArray(value)) return value.map((item) => cleanJson(item));
   if (typeof value === "undefined") return null;
@@ -151,6 +139,15 @@ function cleanJson(value: unknown): unknown {
     Object.entries(value as Record<string, unknown>)
       .filter(([, item]) => typeof item !== "undefined")
       .map(([key, item]) => [key, cleanJson(item)])
+  );
+}
+
+function cleanTelemetryMetadata(input: Record<string, string | number | boolean | null | undefined>): Record<string, string | number | boolean> {
+  return Object.fromEntries(
+    Object.entries(input).filter((entry): entry is [string, string | number | boolean] => {
+      const value = entry[1];
+      return typeof value === "string" || typeof value === "number" || typeof value === "boolean";
+    })
   );
 }
 

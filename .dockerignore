@@ -1,0 +1,52 @@
+# 依赖与构建产物
+node_modules
+**/node_modules
+dist
+**/dist
+*.tsbuildinfo
+
+# 本地数据与数据库
+data
+*.db
+*.sqlite
+*.db-journal
+*.db-wal
+*.db-shm
+
+# 本地配置（用户通过 volume 挂载自己的配置）
+.env.local
+.env
+config/llm.local.yaml
+config/*.local.yaml
+
+# 版本控制与 IDE
+.git
+.github
+.vscode
+.idea
+
+# 文档与脚本（运行时不需要）
+docs
+scripts
+*.md
+!packages/db/prisma/README.md
+
+# 测试与开发工具
+apps/api/src/tests
+apps/api/vitest.*.config.ts
+coverage
+
+# 内部产物
+.codex
+.codex-tmp
+.codex-artifacts
+.codex-run
+.codex-runlogs
+.workbuddy
+.claude
+.claude-tmp
+.playwright-mcp
+
+# 临时文件
+*.log
+tmp

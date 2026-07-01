@@ -704,6 +704,10 @@ ${JSON.stringify({ profileId: input.profile.profileId, demographics: input.profi
       timeout: context.timeoutMs && context.timeoutMs > 0
         ? { totalMs: context.timeoutMs, stepMs: context.stepTimeoutMs }
         : undefined,
+      // ai@7 默认不保留 step.request.body/messages 和 step.response.body，
+      // 但 persistStep 依赖这两个字段写 AgentTurn.requestJson/rawResponseJson。
+      // 显式开启以恢复 v6 默认行为，保证审计载荷不静默丢失。
+      include: { requestBody: true, requestMessages: true, responseBody: true },
       ...aiSdkTrace({
         runId: context.runId,
         taskType: "agent_turn",

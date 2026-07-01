@@ -1487,9 +1487,9 @@ models:
 
 ### 10.5 Docker
 
-[docker-compose.yml](docker-compose.yml) 仅包含 PostgreSQL 17-alpine 服务（端口 5432，DB=trycue，user=trycue，password=trycue）。
+[docker-compose.yml](docker-compose.yml) 基于 GHCR 镜像 `ghcr.io/donghao95/trycue:latest` 编排 TryCue 应用容器（API + 静态 Web），使用 SQLite 持久化（`./data` 挂载到 `/app/data`），端口 4000。一键启动也可用 [scripts/docker-run.ps1](scripts/docker-run.ps1)（Windows）或 [scripts/docker-run.sh](scripts/docker-run.sh)（macOS/Linux）。
 
-**当前本地默认使用 SQLite，无需 Docker**。
+**本地开发默认使用 SQLite，无需 Docker**（见 `.env.example` 的 `DATABASE_URL`）。
 
 ---
 

@@ -22,6 +22,11 @@ export type AppConfig = {
   maxCoverImageSizeMb: number;
   enableScheduler: boolean;
   enableReportGeneration: boolean;
+  // 生产模式下是否由 API 托管前端 SPA 静态资源（apps/web/dist）。
+  // dev 模式由 Vite dev server 自行托管，不需要此开关。
+  // Docker 单容器部署时设为 true。
+  serveWeb: boolean;
+  webDistPath: string;
 };
 
 function numberEnv(name: string, fallback: number): number {
@@ -52,7 +57,9 @@ export function loadConfig(): AppConfig {
     sseHeartbeatIntervalSeconds: numberEnv("SSE_HEARTBEAT_INTERVAL", 15),
     maxCoverImageSizeMb: numberEnv("MAX_COVER_IMAGE_SIZE_MB", 5),
     enableScheduler: process.env.ENABLE_SCHEDULER !== "false",
-    enableReportGeneration: process.env.ENABLE_REPORT_GENERATION !== "false"
+    enableReportGeneration: process.env.ENABLE_REPORT_GENERATION !== "false",
+    serveWeb: process.env.SERVE_WEB === "true",
+    webDistPath: resolveWorkspacePath(process.env.WEB_DIST_PATH ?? "apps/web/dist")
   };
 }
 
