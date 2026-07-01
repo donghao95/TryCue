@@ -18,6 +18,10 @@ logs/
 .env.*
 !.env.example
 
+# Local docker compose override (个人本地测试用，不提交)
+docker-compose.override.yml
+docker-compose.override.*.yml
+
 # Local LLM config (keep llm.example.yaml tracked)
 config/llm.local.yaml
 config/*.local.yaml

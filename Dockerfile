@@ -33,16 +33,14 @@ RUN pnpm db:generate
 RUN pnpm build
 
 # ─── Stage 2: Runtime ───
-# 只保留生产依赖 + 构建产物，镜像更小
+# 直接复用 builder 整个目录（含 node_modules、已编译的 better-sqlite3 native binding、已生成的 Prisma client）
 FROM node:24-slim AS runner
 
-# better-sqlite3 运行时仍需要 native binding，runner 阶段重新安装生产依赖以编译 binding
+# 安装 openssl（Prisma query engine 依赖）+ ca-certificates（HTTPS 请求需要）
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    python3 \
-    make \
-    g++ \
+    openssl \
+    ca-certificates \
     && rm -rf /var/lib/apt/lists/*
-RUN corepack enable
 
 WORKDIR /app
 
@@ -56,37 +54,29 @@ ENV ENABLE_REPORT_GENERATION=true
 ENV LOG_LEVEL=info
 ENV API_PORT=4000
 
-# 拷贝依赖清单 + workspace 配置
-COPY --from=builder /app/package.json /app/pnpm-workspace.yaml /app/pnpm-lock.yaml ./
-COPY --from=builder /app/apps/api/package.json ./apps/api/
-COPY --from=builder /app/apps/web/package.json ./apps/web/
-COPY --from=builder /app/packages/db/package.json ./packages/db/
-COPY --from=builder /app/packages/shared/package.json ./packages/shared/
+# 从 builder 复制整个构建产物（含 node_modules、dist、prisma client、better-sqlite3 编译产物）
+COPY --from=builder /app .
 
-# 安装生产依赖（重新编译 better-sqlite3 native binding）
-RUN pnpm install --frozen-lockfile --prod
-
-# 拷贝构建产物
-COPY --from=builder /app/apps/api/dist ./apps/api/dist
-COPY --from=builder /app/apps/web/dist ./apps/web/dist
-COPY --from=builder /app/packages/db/dist ./packages/db/dist
-COPY --from=builder /app/packages/shared/dist ./packages/shared/dist
-
-# 拷贝 Prisma schema + migrations（运行时迁移需要）
-COPY --from=builder /app/packages/db/prisma ./packages/db/prisma
+# 在 runner 环境重新生成 Prisma client（确保 query engine binary 匹配运行时 openssl 版本）
+RUN cd packages/db && npx prisma generate --schema prisma/schema.prisma
 
 # 拷贝默认配置模板（用户可通过 volume 覆盖）
-COPY --from=builder /app/config/llm.example.yaml ./config/llm.local.yaml
+RUN cp config/llm.example.yaml config/llm.local.yaml
 
 # 数据目录（SQLite 数据库文件）
 RUN mkdir -p /app/data /app/config /app/apps/api/uploads
 
-# 非 root 用户运行容器，减少攻击面
-RUN groupadd -r app && useradd -r -g app -d /app -s /sbin/nologin app && \
-    chown -R app:app /app/data /app/config /app/apps/api/uploads
-USER app
+# 创建 app 用户（固定 UID/GID=1001，方便 Linux host 端 chown bind-mounted 目录到匹配值）。
+# V1：容器以 root 运行，以兼容 Windows Docker Desktop bind mount 的 uid 映射问题
+# （app 用户对 host 挂载的 /app/data 文件只读，导致 SQLite "readonly database" 写入失败）。
+# 后续可引入 entrypoint chown + gosu 降权到 app 用户，恢复非 root 运行。
+RUN groupadd -r -g 1001 app && useradd -r -u 1001 -g app -d /app -s /sbin/nologin app && \
+    chown -R app:app /app
 
-VOLUME ["/app/data", "/app/config"]
+# 注意：/app/config 不声明为 VOLUME。
+# 用户通过 compose 或 docker run -v 显式挂载 config 目录。
+# 声明 VOLUME 会触发 Docker 创建匿名 volume 覆盖镜像内默认配置。
+VOLUME ["/app/data"]
 
 EXPOSE 4000
 

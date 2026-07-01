@@ -44,7 +44,6 @@ fi
 # 确保数据目录存在
 mkdir -p "$REPO_ROOT/data"
 mkdir -p "$REPO_ROOT/config"
-mkdir -p "$REPO_ROOT/uploads"
 
 # 确保 LLM 配置模板存在
 LLM_CONFIG="$REPO_ROOT/config/llm.local.yaml"
@@ -69,12 +68,15 @@ echo ""
 # 如果已有同名容器在运行，先停止
 docker rm -f trycue 2>/dev/null || true
 
+# uploads 默认不挂载：用镜像内 baked 的 demo 图片。
+# 如需持久化用户上传图片，需先从镜像拷出 demo 图片到 ./uploads，再在下方 docker run 加：
+#   -v "$REPO_ROOT/uploads:/app/apps/api/uploads"
+# 拷出命令：docker run --rm --entrypoint sh "$IMAGE" -c "tar -C /app/apps/api/uploads -cf - ." | tar -C ./uploads -xf -
 docker run -d \
   --name trycue \
   -p "${PORT}:4000" \
   -v "$REPO_ROOT/data:/app/data" \
-  -v "$LLM_CONFIG:/app/config/llm.local.yaml:ro" \
-  -v "$REPO_ROOT/uploads:/app/apps/api/uploads" \
+  -v "$REPO_ROOT/config:/app/config" \
   -e APP_URL="http://localhost:$PORT" \
   -e LOG_LEVEL=info \
   --restart unless-stopped \

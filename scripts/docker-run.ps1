@@ -45,12 +45,6 @@ if (-not (Test-Path $llmConfig)) {
   Copy-Item "config/llm.example.yaml" $llmConfig
 }
 
-# 确保上传目录存在
-$uploadsDir = Join-Path $RepoRoot "uploads"
-if (-not (Test-Path $uploadsDir)) {
-  New-Item -ItemType Directory -Path $uploadsDir -Force | Out-Null
-}
-
 $image = "ghcr.io/donghao95/trycue:$Tag"
 
 Write-Host "Pulling image: $image"
@@ -67,12 +61,15 @@ Write-Host ""
 # 如果已有同名容器在运行，先停止
 docker rm -f trycue 2>$null | Out-Null
 
+# uploads 默认不挂载：用镜像内 baked 的 demo 图片。
+# 如需持久化用户上传图片，需先从镜像拷出 demo 图片到 ./uploads，再在下方 docker run 加：
+#   -v "${RepoRoot}/uploads:/app/apps/api/uploads"
+# 拷出命令：docker run --rm --entrypoint sh ghcr.io/donghao95/trycue:$Tag -c "tar -C /app/apps/api/uploads -cf - ." | tar -C ./uploads -xf -
 docker run -d `
   --name trycue `
   -p "${Port}:4000" `
   -v "${dataDir}:/app/data" `
-  -v "${llmConfig}:/app/config/llm.local.yaml:ro" `
-  -v "${uploadsDir}:/app/apps/api/uploads" `
+  -v "${configDir}:/app/config" `
   -e APP_URL="http://localhost:$Port" `
   -e LOG_LEVEL=info `
   --restart unless-stopped `

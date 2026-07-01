@@ -130,13 +130,13 @@ importers:
       better-sqlite3:
         specifier: ^11.9.1
         version: 11.10.0
+      prisma:
+        specifier: 6.19.3
+        version: 6.19.3(typescript@5.9.3)
     devDependencies:
       '@types/better-sqlite3':
         specifier: ^7.6.13
         version: 7.6.13
-      prisma:
-        specifier: 6.19.3
-        version: 6.19.3(typescript@5.9.3)
       tsx:
         specifier: ^4.22.4
         version: 4.22.4
