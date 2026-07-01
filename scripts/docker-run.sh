@@ -2,7 +2,7 @@
 # TryCue Docker 一键启动脚本（macOS / Linux）
 #
 # 用法：
-#   ./scripts/docker-run.sh                 最新版，端口 4000
+#   ./scripts/docker-run.sh                 最新版，端口 2671
 #   ./scripts/docker-run.sh --tag v0.2.0    指定版本
 #   ./scripts/docker-run.sh --port 8080     指定端口
 #
@@ -15,7 +15,7 @@ REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$REPO_ROOT"
 
 TAG="latest"
-PORT=4000
+PORT=2671
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -74,7 +74,7 @@ docker rm -f trycue 2>/dev/null || true
 # 拷出命令：docker run --rm --entrypoint sh "$IMAGE" -c "tar -C /app/apps/api/uploads -cf - ." | tar -C ./uploads -xf -
 docker run -d \
   --name trycue \
-  -p "${PORT}:4000" \
+  -p "${PORT}:2671" \
   -v "$REPO_ROOT/data:/app/data" \
   -v "$REPO_ROOT/config:/app/config" \
   -e APP_URL="http://localhost:$PORT" \

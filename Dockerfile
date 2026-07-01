@@ -52,7 +52,7 @@ ENV WEB_DIST_PATH=/app/apps/web/dist
 ENV ENABLE_SCHEDULER=true
 ENV ENABLE_REPORT_GENERATION=true
 ENV LOG_LEVEL=info
-ENV API_PORT=4000
+ENV API_PORT=2671
 # 容器内必须绑 0.0.0.0 才能被宿主机端口映射访问。
 # 暴露到公网时务必在 docker-compose.yml 或 docker run -e 设置 API_AUTH_TOKEN。
 ENV API_HOST=0.0.0.0
@@ -81,11 +81,11 @@ RUN groupadd -r -g 1001 app && useradd -r -u 1001 -g app -d /app -s /sbin/nologi
 # 声明 VOLUME 会触发 Docker 创建匿名 volume 覆盖镜像内默认配置。
 VOLUME ["/app/data"]
 
-EXPOSE 4000
+EXPOSE 2671
 
 # 健康检查
 HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \
-    CMD node -e "fetch('http://localhost:4000/health').then(r=>r.ok?process.exit(0):process.exit(1)).catch(()=>process.exit(1))"
+    CMD node -e "fetch('http://localhost:2671/health').then(r=>r.ok?process.exit(0):process.exit(1)).catch(()=>process.exit(1))"
 
 # 启动时自动应用 migration，然后启动 API
 CMD ["sh", "-c", "node packages/db/dist/applyMigrations.js && node apps/api/dist/index.js"]

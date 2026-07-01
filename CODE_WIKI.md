@@ -548,7 +548,7 @@ AudienceGenerationJob (锁机制)
 1. `import "./env.js"` — 加载 `.env.local` / `.env`
 2. `loadConfig()` — 从环境变量读取配置
 3. `buildApp(config)` — 构建 Fastify 实例
-4. `app.listen({ port: config.port, host: "0.0.0.0" })` — 默认端口 4000
+4. `app.listen({ port: config.port, host: "0.0.0.0" })` — 默认端口 2671
 
 [app.ts](apps/api/src/app.ts) `buildApp(config)` 流程：
 1. 创建 Fastify 实例（pino logger）
@@ -568,7 +568,7 @@ AudienceGenerationJob (锁机制)
 [config.ts](apps/api/src/config.ts) 导出 `AppConfig` 类型（24 个字段）和 `loadConfig()` 函数。
 
 关键默认值：
-- `port = 4000`
+- `port = 2671`
 - `schedulerDefaultConcurrency = 2`
 - `runClockScale = 10`（模拟时间倍率）
 - LLM 容量由 `config/llm.local.yaml` 的 `capacity` 字段管理（RPM + 并发双限流、AIMD 自动调整，见 `docs/03_Agent运行时设计.md` 9.3 节）
@@ -1335,7 +1335,7 @@ pnpm dev:local
 
 **访问地址**：
 - Web: http://localhost:3000
-- API: http://localhost:4000
+- API: http://localhost:2671
 
 ### 9.2 写入 demo 种子数据
 
@@ -1404,7 +1404,7 @@ pnpm test:integration
 |---|---|---|
 | `APP_ENV` | local | 应用环境 |
 | `APP_URL` | http://localhost:3000 | Web 地址（CORS origin） |
-| `API_PORT` | 4000 | API 端口 |
+| `API_PORT` | 2671 | API 端口 |
 | `DATABASE_URL` | file:./data/trycue.db | 数据库 URL |
 | `LLM_CONFIG_PATH` | config/llm.local.yaml | LLM 配置文件路径 |
 | `SCHEDULER_WORKER_ID` | local-worker-1 | Scheduler worker 标识 |
@@ -1487,7 +1487,7 @@ models:
 
 ### 10.5 Docker
 
-[docker-compose.yml](docker-compose.yml) 基于 GHCR 镜像 `ghcr.io/donghao95/trycue:latest` 编排 TryCue 应用容器（API + 静态 Web），使用 SQLite 持久化（`./data` 挂载到 `/app/data`），端口 4000。一键启动也可用 [scripts/docker-run.ps1](scripts/docker-run.ps1)（Windows）或 [scripts/docker-run.sh](scripts/docker-run.sh)（macOS/Linux）。
+[docker-compose.yml](docker-compose.yml) 基于 GHCR 镜像 `ghcr.io/donghao95/trycue:latest` 编排 TryCue 应用容器（API + 静态 Web），使用 SQLite 持久化（`./data` 挂载到 `/app/data`），端口 2671。一键启动也可用 [scripts/docker-run.ps1](scripts/docker-run.ps1)（Windows）或 [scripts/docker-run.sh](scripts/docker-run.sh)（macOS/Linux）。
 
 **本地开发默认使用 SQLite，无需 Docker**（见 `.env.example` 的 `DATABASE_URL`）。
 

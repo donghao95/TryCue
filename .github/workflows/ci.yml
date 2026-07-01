@@ -67,7 +67,7 @@ jobs:
           node apps/api/dist/index.js &
           PID=$!
           for i in $(seq 1 15); do
-            if curl -sf http://localhost:4000/health >/dev/null 2>&1; then
+            if curl -sf http://localhost:2671/health >/dev/null 2>&1; then
               echo "Production startup smoke passed"
               kill $PID 2>/dev/null || true
               wait $PID 2>/dev/null || true

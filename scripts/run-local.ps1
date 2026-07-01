@@ -62,6 +62,6 @@ if ($SeedDemo) {
 Write-Host ""
 Write-Host "Starting TryCue:"
 Write-Host "- Web: http://localhost:3000"
-Write-Host "- API: http://localhost:4000"
+Write-Host "- API: http://localhost:2671"
 Write-Host ""
 Invoke-Native "pnpm" "dev"
