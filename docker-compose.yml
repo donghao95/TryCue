@@ -1,22 +1,33 @@
-# 注意：V1 本地开发使用 SQLite（见 .env.example 的 DATABASE_URL），
-# 不需要启动本文件中的 Postgres。此文件仅为未来生产环境迁移 PostgreSQL
-# 保留的实验性配置，外部贡献者 clone 仓库后无需 docker compose up。
-services:
-  postgres:
-    image: postgres:17-alpine
-    environment:
-      POSTGRES_DB: trycue
-      POSTGRES_USER: trycue
-      POSTGRES_PASSWORD: trycue
-    ports:
-      - "5432:5432"
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U trycue -d trycue"]
-      interval: 3s
-      timeout: 3s
-      retries: 20
-    volumes:
-      - trycue-postgres:/var/lib/postgresql/data
+# TryCue Docker Compose
+#
+# 用法：
+#   1. 准备配置：cp config/llm.example.yaml config/llm.local.yaml（按需修改）
+#   2. docker compose up -d
+#   3. 访问 http://localhost:4000
+#
+# 数据持久化：./data 目录挂载到容器内 /app/data，SQLite 数据库保存在此
+# 配置覆盖：./config/llm.local.yaml 挂载到容器内 /app/config/llm.local.yaml
+#
+# 注意：V1 本地开发也可使用 SQLite（见 .env.example 的 DATABASE_URL），不需要 Docker。
+# 此文件用于基于 GHCR 镜像的一键部署。
 
-volumes:
-  trycue-postgres:
+services:
+  trycue:
+    image: ghcr.io/donghao95/trycue:latest
+    container_name: trycue
+    ports:
+      - "4000:4000"
+    volumes:
+      # 数据持久化
+      - ./data:/app/data
+      # LLM 配置（用户在此文件填入真实 key 切换 real 模式）
+      - ./config/llm.local.yaml:/app/config/llm.local.yaml:ro
+      # 上传的图片持久化
+      - ./uploads:/app/apps/api/uploads
+    environment:
+      - APP_URL=http://localhost:4000
+      - LOG_LEVEL=info
+      # mock 模式开箱即用；要切 real 模式在 config/llm.local.yaml 里改 runtimeMode
+      - ENABLE_SCHEDULER=true
+      - ENABLE_REPORT_GENERATION=true
+    restart: unless-stopped

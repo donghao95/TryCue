@@ -1,0 +1,26 @@
+name: Release
+
+on:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  release-please:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: googleapis/release-please-action@v4
+        with:
+          # 单一 release：所有包作为一个整体发版，不拆分为 @trycue/api、@trycue/web 等
+          # 因为所有包都是 private，不会发布到 npm，release-please 只负责：
+          # 1. 维护 release PR（自动 bump 版本号 + 更新 CHANGELOG）
+          # 2. 合并 release PR 后打 git tag + 创建 GitHub Release
+          release-type: node
+          # 不在 tag 里包含组件名（@trycue/api-v0.1.0 → v0.1.0）
+          include-component-in-tag: false
+          # 只 bump 根 package.json 的版本
+          package-name: trycue

@@ -1,4 +1,6 @@
+import { existsSync } from "node:fs";
 import { mkdir } from "node:fs/promises";
+import { join } from "node:path";
 import cors from "@fastify/cors";
 import multipart from "@fastify/multipart";
 import fastifyStatic from "@fastify/static";
@@ -61,10 +63,42 @@ export async function buildApp(config: AppConfig) {
     limits: { fileSize: config.maxCoverImageSizeMb * 1024 * 1024, files: 1 }
   });
   await mkdir(uploadDir, { recursive: true });
+
+  // 生产模式：先注册前端 SPA 静态资源（需要 decorateReply: true 以便 notFoundHandler 调用 reply.sendFile）
+  if (config.serveWeb) {
+    const webDist = config.webDistPath;
+    if (!existsSync(join(webDist, "index.html"))) {
+      throw new Error(`SERVE_WEB=true but apps/web/dist/index.html not found at ${webDist}. Run "pnpm build" first.`);
+    }
+    // 先注册 webDist：decorateReply: true 装饰 reply.sendFile 绑定到 webDist
+    // wildcard: true 注册 GET /* 路由，服务 /assets/* 等静态资源
+    // Fastify find-my-way 按特异性匹配，/api/* 和 /uploads/* 比 /* 更具体，会优先匹配
+    await app.register(fastifyStatic, {
+      root: webDist,
+      prefix: "/",
+      wildcard: true
+    });
+    log.info({ webDist }, "Serving frontend SPA from API");
+  }
+
+  // 再注册 uploads：decorateReply: false 避免覆盖 webDist 的 reply.sendFile 装饰
   await app.register(fastifyStatic, {
     root: uploadDir,
-    prefix: "/uploads/"
+    prefix: "/uploads/",
+    decorateReply: false
   });
+
+  // SPA fallback：未匹配的 GET 请求（非 /api、非 /uploads）返回 index.html
+  // reply.sendFile 绑定到第一次注册的 webDist，路径正确
+  if (config.serveWeb) {
+    app.setNotFoundHandler((request, reply) => {
+      if (request.method !== "GET" || request.url.startsWith("/api") || request.url.startsWith("/uploads")) {
+        reply.code(404).send({ error: "Not found" });
+        return;
+      }
+      reply.sendFile("index.html");
+    });
+  }
 
   // ── Request logging ──
   app.addHook("onResponse", (request, reply, done) => {
