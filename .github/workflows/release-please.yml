@@ -26,3 +26,6 @@ jobs:
           # （GitHub 防递归规则），导致 docker.yml 监听的 push.tags:v* 永远不触发。
           # PAT 创建的 tag 能正常触发 docker 镜像构建。
           token: ${{ secrets.GH_PAT }}
+          # 临时：强制首次 release 为 0.1.1（默认会跳到 1.0.0）。
+          # 发版后必须删除此行，否则以后每次 release 都会被强制为 0.1.1。
+          release-as: "0.1.1"
