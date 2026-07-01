@@ -40,7 +40,7 @@
     "db:seed-demo": "pnpm --filter @trycue/db db:seed-demo"
   },
   "devDependencies": {
-    "@types/node": "^25.9.1",
+    "@types/node": "^26.0.1",
     "cross-env": "^10.1.0",
     "typescript": "^6.0.3"
   },
