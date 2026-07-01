@@ -76,6 +76,6 @@ fi
 echo ""
 echo "Starting TryCue:"
 echo "  - Web: http://localhost:3000"
-echo "  - API: http://localhost:4000"
+echo "  - API: http://localhost:2671"
 echo ""
 exec pnpm dev

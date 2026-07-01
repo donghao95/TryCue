@@ -47,7 +47,7 @@ export function loadConfig(): AppConfig {
   return {
     appEnv: process.env.APP_ENV ?? "local",
     appUrl: process.env.APP_URL ?? "http://localhost:3000",
-    port: numberEnv("API_PORT", 4000),
+    port: numberEnv("API_PORT", 2671),
     // 默认只监听本机回环，避免局域网误暴露。
     // 需要容器内或局域网访问时显式设置 API_HOST=0.0.0.0。
     host: process.env.API_HOST ?? "127.0.0.1",

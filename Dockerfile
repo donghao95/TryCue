@@ -81,11 +81,11 @@ RUN groupadd -r -g 1001 app && useradd -r -u 1001 -g app -d /app -s /sbin/nologi
 # 声明 VOLUME 会触发 Docker 创建匿名 volume 覆盖镜像内默认配置。
 VOLUME ["/app/data"]
 
-EXPOSE 4000
+EXPOSE 2671
 
 # 健康检查
 HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \
-    CMD node -e "fetch('http://localhost:4000/health').then(r=>r.ok?process.exit(0):process.exit(1)).catch(()=>process.exit(1))"
+    CMD node -e "fetch('http://localhost:2671/health').then(r=>r.ok?process.exit(0):process.exit(1)).catch(()=>process.exit(1))"
 
 # 启动时自动应用 migration，然后启动 API
 CMD ["sh", "-c", "node packages/db/dist/applyMigrations.js && node apps/api/dist/index.js"]

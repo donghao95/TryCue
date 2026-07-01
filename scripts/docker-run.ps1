@@ -10,7 +10,7 @@
   镜像版本，默认 latest
 
 .PARAMETER Port
-  宿主机端口，默认 4000
+  宿主机端口，默认 2671
 
 .EXAMPLE
   .\scripts\docker-run.ps1
@@ -18,7 +18,7 @@
 #>
 param(
   [string]$Tag = "latest",
-  [int]$Port = 4000
+  [int]$Port = 2671
 )
 
 $ErrorActionPreference = "Stop"
@@ -67,7 +67,7 @@ docker rm -f trycue 2>$null | Out-Null
 # 拷出命令：docker run --rm --entrypoint sh ghcr.io/donghao95/trycue:$Tag -c "tar -C /app/apps/api/uploads -cf - ." | tar -C ./uploads -xf -
 docker run -d `
   --name trycue `
-  -p "${Port}:4000" `
+  -p "${Port}:2671" `
   -v "${dataDir}:/app/data" `
   -v "${configDir}:/app/config" `
   -e APP_URL="http://localhost:$Port" `
