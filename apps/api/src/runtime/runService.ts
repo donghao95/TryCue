@@ -1391,29 +1391,55 @@ export class RunService {
     const plan = await prisma.audienceSamplingPlan.findUnique({ where: { runId }, include: { directives: true } });
     if (!plan) throw new ApiError("AUDIENCE_PLAN_REQUIRED", "需要先生成观众采样计划", 409);
     if (plan.status !== "ready_for_review") throw new ApiError("INVALID_PLAN_STATUS", "只有待确认的观众计划可以确认", 409);
+    // 事务外先做一次预检：避免明显非法的 plan 也进入事务，浪费 BEGIN IMMEDIATE。
+    // 事务外预检失败抛 400：plan 在用户提交时确实非法。
     const quantityTotal = directiveQuantityTotal(plan.directives);
     const validation = samplingPlanValidation(quantityTotal ?? plan.totalCount, plan.directives);
     if (!validation.isQuantityValid || plan.directives.length === 0) throw new ApiError("AUDIENCE_PLAN_INVALID", "人群计划数量不合法", 400, validation);
+    const planId = plan.id;
     const job = await prisma.$transaction(async (tx) => {
       // 乐观锁：若事务外读取后、事务提交前 plan.status 被另一个确认改掉，
       // updateMany 匹配 0 行，抛 409。
+      // 事务内重读 directives：减少 confirm 侧读陈旧——事务外读到的 directives
+      // 可能被并发 directive 编辑/删除改写，事务内用 BEGIN IMMEDIATE 持 RESERVED 锁
+      // 后重读，读到的是最新已提交值，事务期间无并发写。用事务内值写入
+      // plan.totalCount / testRun.audienceCount / job.targetCount，避免用过期
+      // quantityTotal 覆盖 directive 编辑事务刚写的正确值。
+      // 修复 Codex P1 评论：confirm 用事务外旧 quantityTotal 写入会与并发 directive
+      // 编辑产生数据不一致，而乐观锁（status: ready_for_review）不拦截 directive 编辑
+      // （requireEditableSamplingPlan 只检查 confirmedAt，不检查 status）。
+      // 注意：此处只关闭 confirm 侧读陈旧；directive 编辑侧在 confirm 提交后排队
+      // 等待 RESERVED 锁、提交后覆盖 totalCount 的写后确认竞态是 pre-existing，
+      // 需在 directive 编辑事务内重检 confirmedAt 后另修。
+      const freshDirectives = await tx.audienceSamplingDirective.findMany({
+        where: { planId },
+        select: { quantity: true }
+      });
+      const freshQuantityTotal = directiveQuantityTotal(freshDirectives);
+      const freshValidation = samplingPlanValidation(freshQuantityTotal ?? plan.totalCount, freshDirectives);
+      // 事务外预检已通过，若事务内 freshValidation 失败，只能是事务外读后、事务内读前
+      // 有并发 directive 编辑/删除提交（如删除最后一条 directive）。这是并发修改冲突，
+      // 不是用户请求非法，返回 409 而非 400。
+      if (!freshValidation.isQuantityValid || freshDirectives.length === 0) {
+        throw new ApiError("AUDIENCE_PLAN_CONFLICT", "人群计划已被并发修改，请刷新后重试", 409, freshValidation);
+      }
       const confirmed = await tx.audienceSamplingPlan.updateMany({
-        where: { id: plan.id, status: "ready_for_review" },
+        where: { id: planId, status: "ready_for_review" },
         data: {
           confirmedAt: new Date(),
           status: "expanding_profiles",
-          totalCount: quantityTotal,
+          totalCount: freshQuantityTotal,
           errorMessage: null
         }
       });
       if (confirmed.count === 0) throw new ApiError("INVALID_PLAN_STATUS", "只有待确认的观众计划可以确认", 409);
-      await tx.testRun.update({ where: { id: runId }, data: { status: "generating_audience", audienceCount: quantityTotal, errorMessage: null } });
+      await tx.testRun.update({ where: { id: runId }, data: { status: "generating_audience", audienceCount: freshQuantityTotal, errorMessage: null } });
       return tx.audienceGenerationJob.create({
         data: {
           runId,
           scope: "profile_expansion",
-          samplingPlanId: plan.id,
-          targetCount: quantityTotal,
+          samplingPlanId: planId,
+          targetCount: freshQuantityTotal,
           batchSize: 10
         }
       });
