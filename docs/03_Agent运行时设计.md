@@ -823,7 +823,7 @@ const result = await generateText({
   stopWhen: stepCountIs(20),
   abortSignal: context.signal,
   maxRetries: LLM_MAX_RETRIES,
-  onStepFinish: async (step) => {
+  onStepEnd: async (step) => {
     // 持久化当前步
     await persistStep(ctx.currentAgentTurnId, step);
     // 创建下一步的 AgentTurn
@@ -878,7 +878,7 @@ async function withToolContext(
 }
 ```
 
-### 5.4 onStepFinish
+### 5.4 onStepEnd
 
 在每步工具执行完毕后调用，持久化：
 
@@ -917,7 +917,7 @@ async function withToolContext(
 ### 5.9 工具副作用与 transcript 原子提交
 
 - 工具 `execute` 在事务内：创建/复用 `AgentToolCall` + 执行业务逻辑 + 写入 tool observation/transcript + 写入 live event outbox
-- `onStepFinish` 在事务外只补充 assistant text、reasoning、raw request/response 等模型输出审计信息，并与已提交工具结果对齐
+- `onStepEnd` 在事务外只补充 assistant text、reasoning、raw request/response 等模型输出审计信息，并与已提交工具结果对齐
 - 不允许出现"点赞/评论等副作用已提交，但对应工具 observation 和证据链缺失"的状态
 
 ### 5.10 AgentRunner 执行循环
@@ -1033,7 +1033,7 @@ AI SDK 的 `@ai-sdk/openai-compatible` provider 双向支持 MiMo 的 `reasoning
 - **发消息**：assistant message 中的 `ReasoningPart` 自动转为 `{ reasoning_content: "..." }` 发回 API
 
 存储链路：
-1. `onStepFinish` → `step.reasoningText` 存入 `AgentTurn.reasoningContent` 和 transcript item
+1. `onStepEnd` → `step.reasoningText` 存入 `AgentTurn.reasoningContent` 和 transcript item
 2. `renderSessionMessages` → 从 transcript 读 `reasoningContent`，放入 assistant message
 3. `toAiSdkMessages` → `ReasoningPart` 传给 AI SDK → provider 自动转为 `reasoning_content` 发回模型
 

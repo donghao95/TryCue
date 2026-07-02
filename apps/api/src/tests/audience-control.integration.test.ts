@@ -265,6 +265,27 @@ describe("audience sampling plan and identity flow", () => {
     await app.close();
   }, 30000);
 
+  it("blocks directive deletion after confirmation", async () => {
+    // 回归测试：[CONCERN 2] 修复后，DELETE 最后一条 directive 也必须走乐观锁检查，
+    // 不能因 quantityTotal===0 跳过 updateMany 导致静默成功。
+    const app = await buildApp({ ...loadConfig(), appEnv: "test", llmConfigPath, enableScheduler: false });
+    const runId = await createRun(app);
+    const plan = await createSamplingPlanForReview(app, runId);
+    const confirmed = await app.inject({ method: "POST", url: `/api/runs/${runId}/audience-sampling-plan/confirm`, payload: {} });
+    expect(confirmed.statusCode).toBe(200);
+
+    const directiveId = plan.plan!.directives[0]!.id;
+    const deleted = await app.inject({
+      method: "DELETE",
+      url: `/api/runs/${runId}/audience-sampling-plan/directives/${directiveId}`
+    });
+    expect(deleted.statusCode).toBe(409);
+    expect(deleted.json().error.code).toBe("PLAN_CONFIRMED");
+    await waitForAudienceGeneration(app, runId, (data) => !data.activeJob);
+
+    await app.close();
+  }, 30000);
+
   it("warns before partial start and starts only identity-ready profiles when allowed", async () => {
     const app = await buildApp({ ...loadConfig(), appEnv: "test", llmConfigPath, enableScheduler: false });
     const runId = await createAudienceReadyRun(app);

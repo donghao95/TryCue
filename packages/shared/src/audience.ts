@@ -171,7 +171,10 @@ export const AudienceSamplingPlanViewSchema = z.object({
   dimensions: z.array(z.string()),
   confirmedAt: z.string().nullable(),
   directives: z.array(AudienceSamplingDirectiveSchema),
-  validation: AudienceSamplingPlanValidationSchema
+  validation: AudienceSamplingPlanValidationSchema,
+  // plan 失败时的具体错误信息（来自后端 reconcile 孤儿检测或 sampling plan job 失败）。
+  // 前端在 plan.status === "failed" 时优先用它覆盖 generic 兜底文案。
+  errorMessage: z.string().nullable().optional()
 });
 export type AudienceSamplingPlanView = z.infer<typeof AudienceSamplingPlanViewSchema>;
 

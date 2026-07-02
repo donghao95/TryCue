@@ -642,7 +642,7 @@ async function resolveParticipantDeterministicRole(
 ): Promise<DeterministicMockRole> {
   const firstFive = await prisma.runParticipant.findMany({
     where: { runId },
-    orderBy: { id: "asc" },
+    orderBy: { sortOrder: "asc" },
     select: { id: true },
     take: 5
   });

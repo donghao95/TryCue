@@ -859,7 +859,7 @@ createAgentProvider(config, options?) =>
 **类 `RealAgentProvider`**：
 - 构造器：`validateRealLlmConfig` fail-fast，创建 `createOpenAICompatible` provider（`includeUsage: true`，共享 `getSharedRateLimitedFetch()`，底层由 `LlmCapacityManager` 提供 RPM + 并发双限流）
 - `generateAudienceSamplingPlan` — `streamText` + NDJSON frame protocol，用 `NdjsonLineBuffer` + `PlanFrameAccumulator` 累积
-- `runAudienceTurn(context)` — `streamText` + `createAiSdkToolSet`（AI SDK 原生 tool calling），通过 `onStepFinish` 钩子调 `persistStep`
+- `runAudienceTurn(context)` — `streamText` + `createAiSdkToolSet`（AI SDK 原生 tool calling），通过 `onStepEnd` 钩子调 `persistStep`
 
 **温度策略**：
 - `TEMPERATURE_CREATIVE = 0.9`（plan）
@@ -981,7 +981,7 @@ PROMPT_VERSION_REPORT                 = "report_generator_v1"
 #### 6.8.3 [llm/aiSdkTracing.ts](apps/api/src/llm/aiSdkTracing.ts)
 
 - `aiSdkTrace(input)` — 构造 AI SDK `experimental_telemetry` 配置
-- `createTraceIntegration(input)` — `onStepFinish` 钩子，事务里写 `LlmCallTrace` + upsert `RunLlmUsageSummary`
+- `createTraceIntegration(input)` — `onStepEnd` 钩子，事务里写 `LlmCallTrace` + upsert `RunLlmUsageSummary`
 - `normalizeUsage(usage)` — 兼容 OpenAI / Anthropic / 通用字段命名
 
 ### 6.9 SSE 事件总线

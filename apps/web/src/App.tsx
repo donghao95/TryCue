@@ -960,7 +960,7 @@ export function App() {
   // this dedicated hook is the only SSE connection on that page.
   useReportEvents({
     runId: route.kind === "report" ? route.runId : "",
-    onReportRegenerated: () => void loadReport(route.kind === "report" ? route.runId : "", { preserveStatus: true }),
+    onReportRegenerated: (eventRunId) => void loadReport(eventRunId, { preserveStatus: true }),
     onMalformed: () => showAppError(t("audienceGen.toast.sseError"))
   });
 
@@ -1038,7 +1038,7 @@ export function App() {
 
   const isAudienceGenerationActive = Boolean(activeGenerationJob?.active && ["queued", "planning", "generating"].includes(activeGenerationJob.status));
   const isPlanGenerationActive = isAudienceGenerationActive && activeGenerationJob?.scope === "sampling_plan";
-  const hasFailedAudiencePlanPreview = uiStatus === "planning_audience" && !samplingPlan && Boolean(audiencePlanFailureMessage);
+  const hasFailedAudiencePlanPreview = uiStatus === "planning_audience" && Boolean(audiencePlanFailureMessage) && (!samplingPlan || samplingPlan.status === "failed");
   const isSamplingPlanPending = uiStatus === "planning_audience" && !samplingPlan && !hasFailedAudiencePlanPreview;
   const currentAudiencePreparationUi = audiencePreparationUi.runId === visibleRunId ? audiencePreparationUi : emptyAudiencePreparationUiState(visibleRunId || null);
   const isPlanReasoningActive = currentAudiencePreparationUi.phase === "plan_requesting" || currentAudiencePreparationUi.phase === "plan_reasoning";
@@ -1586,6 +1586,8 @@ export function App() {
     ]);
     const planOk = planResponse.success && planResponse.data.runId === id;
     const progressOk = progressResponse.success && progressResponse.data.runId === id;
+    // 提取 plan.errorMessage 用于刷新后的失败提示;在闭包外提取以利用 TypeScript 类型收窄
+    const planErrorMessage = planResponse.success ? planResponse.data.plan?.errorMessage : undefined;
     if (restoreSeq !== undefined && restoreSeq !== restoreRequestSeq.current) return;
     if (id !== activeRunIdRef.current) return;
     setAudienceSampling((current) => ({
@@ -1602,11 +1604,13 @@ export function App() {
         setAudiencePlanFailureMessage("");
       }
       // phase 决策:已确认 → 保留 current.phase;ready_for_review → plan_ready;
-      // planning/failed → 保留 current.phase(SSE 终态事件已设 plan_failed,reload 不应覆盖)
+      // failed → plan_failed（显式恢复,避免刷新后 current.phase=idle 卡死）;
+      // planning → 保留 current.phase（SSE 终态事件已设 plan_failed,reload 不应覆盖）
       commitAudiencePreparationUi((current) => ({
         runId: id,
         phase: isPlanConfirmed ? current.phase
           : planStatus === "ready_for_review" ? "plan_ready"
+          : planStatus === "failed" ? "plan_failed"
           : current.phase,
         planJobId: null,
         reasoningTokens: 0,
@@ -1647,12 +1651,17 @@ export function App() {
       if (isAudiencePreparationUiStatus(uiStatusRef.current) || uiStatusRef.current === "restoring") {
         if (progressResponse.data.status === "ready" || progressResponse.data.status === "ready_with_failures") {
           setUiStatus(progressResponse.data.identityReadyCount > 0 ? "audience_ready" : "generating_audience");
+        } else if (progressResponse.data.status === "failed") {
+          // plan 生成失败：归到 planning_audience,让 hasFailedAudiencePlanPreview 成立以显示错误提示和重试按钮
+          setUiStatus("planning_audience");
+          // 保留 SSE failed 事件已设置的详细错误消息;刷新后无 SSE 时优先用 plan.errorMessage,最后用 generic 兜底
+          setAudiencePlanFailureMessage((current) => current || planErrorMessage || t("audienceGen.toast.planFailed"));
         } else if (progressResponse.data.status !== "not_started") {
           setUiStatus(progressResponse.data.status === "ready_for_review" ? "planning_audience" : "generating_audience");
         } else if (planOk && !planResponse.data.plan && !nextActiveJob) {
           setUiStatus("planning_audience");
           // 保留 SSE failed 事件已设置的详细错误消息;只在没有任何 failureMessage 时才用 generic 兜底
-          setAudiencePlanFailureMessage((current) => current || t("audienceGen.toast.planFailed"));
+          setAudiencePlanFailureMessage((current) => current || planErrorMessage || t("audienceGen.toast.planFailed"));
         }
       }
     }

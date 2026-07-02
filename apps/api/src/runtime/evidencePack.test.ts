@@ -744,4 +744,43 @@ describe("buildAudienceGroups 5 new fields (Stage 3)", () => {
     // d2 exitReasons[0] = p2 的 no_more_action → mainBarrier 不写
     expect(d2!.mainBarrier).toBeUndefined();
   });
+
+  // 回归测试：coreInterestedLowTrust 不应被 core_target directive 数量放大。
+  // 原 bug：外层遍历 coreGroups，内层遍历 facts，导致每个 interested fact 被计数 N 次
+  // （N = core_target directive 数量）。修复后每个 fact 只计一次。
+  // 此测试构造 2 个 core_target directive + 1 个 interested_but_not_convinced participant：
+  //   - 修复前：1 × 2 = 2 >= 2 → coreTargetHighInterestLowTrust = true（错误）
+  //   - 修复后：1 < 2 → coreTargetHighInterestLowTrust = false（正确）
+  it("coreInterestedLowTrust 不被 core_target directive 数量放大", () => {
+    const input = makeBaseInput({
+      participants: [
+        { id: "p1", displayNameSnapshot: "A", profileSnapshotJson: {}, samplingDirectiveId: "d1" }
+      ],
+      directives: [
+        { id: "d1", name: "核心人群1", description: "核心", groupRole: "core_target", samplingReason: "核心" },
+        { id: "d2", name: "核心人群2", description: "核心", groupRole: "core_target", samplingReason: "核心" }
+      ],
+      journeys: [
+        { id: "j1", status: "completed", exitOutcome: "normal", exitReason: "need_more_evidence", participantId: "p1", thoughtSummary: "p1", finalSummary: "p1" }
+      ],
+      toolCalls: [
+        { id: "tc1", agentTurnId: "t1", journeyId: "j1", participantId: "p1", callIndex: 0, toolName: "open_post", status: "committed", input: {}, output: {}, simulatedTime: 10 },
+        { id: "tc2", agentTurnId: "t2", journeyId: "j1", participantId: "p1", callIndex: 1, toolName: "read_post", status: "committed", input: {}, output: { depth: "partial" }, simulatedTime: 20 },
+        { id: "tc3", agentTurnId: "t3", journeyId: "j1", participantId: "p1", callIndex: 2, toolName: "view_comments", status: "committed", input: {}, output: {}, simulatedTime: 30 },
+        { id: "tc4", agentTurnId: "t4", journeyId: "j1", participantId: "p1", callIndex: 3, toolName: "exit_browsing", status: "committed", input: {}, output: { reasonCategory: "need_more_evidence", readingDepth: "partial", interestLevel: "high", trustLevel: "low" }, simulatedTime: 40 }
+      ],
+      turns: [
+        { id: "t1", thoughtText: "点开看看" },
+        { id: "t2", thoughtText: "部分阅读" },
+        { id: "t3", thoughtText: null },
+        { id: "t4", thoughtText: "证据不足离开" }
+      ],
+      postState: { exposureCount: 1, openCount: 1, likeCount: 0, favoriteCount: 0, commentCount: 0, shareCount: 0, exitCount: 1 },
+      audienceCount: 1,
+      completedCount: 1
+    });
+    const pack = buildEvidencePack(input);
+    // 只有 1 个 interested participant，不足 2 人阈值，应为 false
+    expect(pack.audienceGroups.coreTargetHighInterestLowTrust).toBe(false);
+  });
 });

@@ -58,12 +58,9 @@ COPY packages/db/prisma/schema.prisma packages/db/prisma/schema.prisma
 # 只装 prod 依赖（不含 typescript/tsx/vite/@types/* 等 dev 依赖）
 RUN pnpm install --prod --frozen-lockfile
 
-# 生成 Prisma client（runner 需要 @prisma/client 的 query engine binary）。
-# prisma CLI 是 devDependency，--prod 不装，用 npx 临时下载来生成。
-# 权衡：npx 绕过 lockfile，版本固定为 6.19.3（与 @prisma/client 一致），
-# 但不享受 lockfile 的完整性校验和离线缓存。如果 npm registry 不可用构建会失败。
-# 替代方案是从 builder 阶段复制已生成的 node_modules/.prisma/client，但会引入 builder 的依赖残留。
-RUN npx --yes prisma@6.19.3 generate --schema packages/db/prisma/schema.prisma
+# 注意：Prisma generated client（query engine binary）不在此阶段生成。
+# prisma CLI 是 devDependency，--prod 不装；改为在 runner 阶段从 builder 复制已生成的
+# .prisma/client 目录，避免 npx 绕过 lockfile 在线下载（离线/内网构建可用性 + 供应链完整性）。
 
 # ─── Stage 3: Runtime ───
 FROM node:24-slim AS runner
@@ -86,7 +83,7 @@ ENV ENABLE_REPORT_GENERATION=true
 ENV LOG_LEVEL=info
 ENV API_PORT=2671
 # 容器内必须绑 0.0.0.0 才能被宿主机端口映射访问。
-# 暴露到公网时务必在 docker-compose.yml 或 docker run -e 设置 API_AUTH_TOKEN。
+# V1 不提供应用层接口鉴权；公网部署请通过反向代理或网络层 ACL 保护写操作 endpoint。
 ENV API_HOST=0.0.0.0
 
 # 从 prod-deps 复制整个 /app：
@@ -104,6 +101,10 @@ COPY --from=builder /app/apps/web/dist ./apps/web/dist
 COPY --from=builder /app/packages/db/dist ./packages/db/dist
 # migrations 目录只在 builder 有（prod-deps 只复制了 schema.prisma）
 COPY --from=builder /app/packages/db/prisma ./packages/db/prisma
+# Prisma generated client（query engine binary）：builder 阶段 pnpm db:generate 已生成。
+# prod-deps 阶段不跑 prisma generate（prisma CLI 是 devDep），所以必须从 builder 复制。
+# @prisma/client runtime 已由 prod-deps 的 pnpm install --prod 装好（在 dependencies）。
+COPY --from=builder /app/packages/db/node_modules/.prisma ./packages/db/node_modules/.prisma
 COPY --from=builder /app/packages/shared/dist ./packages/shared/dist
 COPY --from=builder /app/config/llm.example.yaml ./config/
 

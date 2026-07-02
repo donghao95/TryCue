@@ -716,7 +716,7 @@ ${JSON.stringify({ profileId: input.profile.profileId, demographics: input.profi
         participantId: context.participantId,
         metadata: { journeyId: context.journeyId, stepIndex: context.stepIndex }
       }),
-      onStepFinish: async (step) => {
+      onStepEnd: async (step) => {
         steps.push(step);
         try {
           await persistStep(runtimeContext.currentAgentTurnId, step, { promptVersion });

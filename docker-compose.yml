@@ -2,9 +2,8 @@
 #
 # 用法：
 #   1. 准备配置：cp config/llm.example.yaml config/llm.local.yaml（按需修改）
-#   2. （强烈建议）生成一个随机 token 写到下方 API_AUTH_TOKEN，保护写操作 endpoint
-#   3. docker compose up -d
-#   4. 访问 http://localhost:2671
+#   2. docker compose up -d
+#   3. 访问 http://localhost:2671
 #
 # 数据持久化：./data 目录挂载到容器内 /app/data，SQLite 数据库保存在此
 # 配置覆盖：./config 目录挂载到容器内 /app/config（rw），用户在 /app/config/llm.local.yaml 改配置
@@ -14,6 +13,10 @@
 #
 # 容器以 root 运行（V1 兼容 Windows Docker Desktop bind mount 的 uid 映射问题）。
 # macOS/Windows/Linux 上 bind-mounted 目录均可直接写，无需手动 chown。
+#
+# 安全提醒：V1 不提供应用层接口鉴权。
+# 暴露到公网/局域网时，必须在请求到达 TryCue API 之前通过反向代理或网络层 ACL 保护写操作 endpoint
+# （如 PUT /api/settings/llm），仅配置 CORS 不能替代服务端鉴权。
 #
 # 注意：V1 本地开发也可使用 SQLite（见 .env.example 的 DATABASE_URL），不需要 Docker。
 # 此文件用于基于 GHCR 镜像的一键部署。
@@ -40,7 +43,4 @@ services:
       - ENABLE_SCHEDULER=true
       - ENABLE_REPORT_GENERATION=true
       # 容器内默认绑 0.0.0.0（Dockerfile 已设），端口映射到宿主机 2671。
-      # 暴露到公网时务必设置 API_AUTH_TOKEN 保护写操作 endpoint（防止 LLM 配置被改写、prompt 窃取）。
-      # 生成方式：openssl rand -hex 32
-      # - API_AUTH_TOKEN=请替换为随机长字符串
     restart: unless-stopped

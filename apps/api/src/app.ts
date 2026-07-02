@@ -1,4 +1,3 @@
-import { timingSafeEqual } from "node:crypto";
 import { existsSync } from "node:fs";
 import { mkdir } from "node:fs/promises";
 import { join } from "node:path";
@@ -154,26 +153,6 @@ export async function buildApp(config: AppConfig) {
 
   app.get("/health", async () => ok({ status: "ok" }));
 
-  // ── Write-operation auth (optional token) ──
-  // 当 config.apiAuthToken 设置时，所有写操作（POST/PUT/PATCH/DELETE）必须带 X-TryCue-Token 头匹配。
-  // GET 请求全部放行：SPA 静态资源（/、/assets/*）、/health、/uploads/*、SSE（EventSource 不支持自定义 header）、
-  // 以及所有 GET /api/* 读操作（前端 fetch GET 不带 token）。
-  // 未设置 token 时跳过鉴权，依赖 host=127.0.0.1 的网络层约束。
-  if (config.apiAuthToken) {
-    const expectedToken = config.apiAuthToken;
-    app.addHook("onRequest", async (request, reply) => {
-      // GET 请求全部放行（静态资源、SSE、读 API）
-      if (request.method === "GET") return;
-      const provided = request.headers["x-trycue-token"];
-      const providedStr = Array.isArray(provided) ? provided[0] : provided;
-      // 用恒定时间比较防止 timing attack
-      if (!providedStr || !safeEqual(providedStr, expectedToken)) {
-        reply.status(401).send({ error: { code: "UNAUTHORIZED", message: "缺少或无效的 X-TryCue-Token" } });
-        return reply;
-      }
-    });
-  }
-
   // ── Business routes (registered as plugins) ──
   // Each route module owns its handlers and helpers; app.ts only assembles.
   await app.register(settingsRoutes({ llmConfigStore, probeManager }));
@@ -196,16 +175,4 @@ export async function buildApp(config: AppConfig) {
   log.info("Startup recovery complete");
   app.decorate("scheduler", scheduler);
   return app;
-}
-
-/**
- * 恒定时间字符串比较，防止 timing attack 泄露 token 信息。
- * 使用 node:crypto 的 native 实现，避免自实现被 JIT 优化的风险。
- * 长度不同时立即返回 false（token 长度对随机生成的字符串不是敏感信息）。
- */
-function safeEqual(a: string, b: string): boolean {
-  const aBuf = Buffer.from(a, "utf8");
-  const bBuf = Buffer.from(b, "utf8");
-  if (aBuf.length !== bBuf.length) return false;
-  return timingSafeEqual(aBuf, bBuf);
 }

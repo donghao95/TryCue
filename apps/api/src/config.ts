@@ -8,10 +8,6 @@ export type AppConfig = {
   // API 监听地址。默认 127.0.0.1（仅本机），显式设置 API_HOST=0.0.0.0 才绑所有网卡。
   // 本地单用户工具默认收紧，避免局域网误暴露导致 LLM 配置可被改写、prompt 窃取等风险。
   host: string;
-  // 可选写操作鉴权 token。若设置，所有写操作（POST/PUT/PATCH/DELETE）必须带 X-TryCue-Token 头匹配。
-  // GET 请求（含 SPA 静态资源、SSE、读 API）不强制鉴权。
-  // 留空则不强制鉴权（仍受 host=127.0.0.1 的网络层约束）。
-  apiAuthToken: string | null;
   llmConfigPath: string;
   schedulerWorkerId: string;
   schedulerDefaultConcurrency: number;
@@ -51,8 +47,6 @@ export function loadConfig(): AppConfig {
     // 默认只监听本机回环，避免局域网误暴露。
     // 需要容器内或局域网访问时显式设置 API_HOST=0.0.0.0。
     host: process.env.API_HOST ?? "127.0.0.1",
-    // 可选写操作 token。留空则不强制鉴权，依赖 host 收紧网络层。
-    apiAuthToken: process.env.API_AUTH_TOKEN ? process.env.API_AUTH_TOKEN.trim() : null,
     llmConfigPath: resolveWorkspacePath(process.env.LLM_CONFIG_PATH ?? "config/llm.local.yaml"),
     schedulerWorkerId: process.env.SCHEDULER_WORKER_ID ?? "local-worker-1",
     schedulerDefaultConcurrency: numberEnv("SCHEDULER_DEFAULT_CONCURRENCY", 2),

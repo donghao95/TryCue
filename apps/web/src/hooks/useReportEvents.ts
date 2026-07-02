@@ -29,7 +29,7 @@ export interface UseReportEventsParams {
   /** Run id from the report route; empty string when not on a report page. */
   runId: string;
   /** Called when a `report.regenerated` event arrives for this run. */
-  onReportRegenerated: () => void;
+  onReportRegenerated: (eventRunId: string) => void;
   /** Called once when the first malformed SSE payload is observed. */
   onMalformed: () => void;
 }
@@ -71,7 +71,9 @@ export function useReportEvents(params: UseReportEventsParams): void {
       // Guard against events from a stale connection (runId changed after the
       // effect was scheduled but before the listener fired).
       if (typeof payload.runId === "string" && payload.runId !== runId) return;
-      onReportRegeneratedRef.current();
+      // 用事件内的 runId 加载报告（而非 effect 闭包的 runId），消除导航瞬间
+      // route.runId 已变但旧 source 仍 fire 事件的 race。
+      onReportRegeneratedRef.current(typeof payload.runId === "string" ? payload.runId : runId);
     });
 
     return () => {
