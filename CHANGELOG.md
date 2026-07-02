@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.1.3](https://github.com/donghao95/TryCue/compare/v0.1.2...v0.1.3) (2026-07-02)
+
+
+### Bug Fixes
+
+* **web:** 修复刷新后"确认计划并生成人设"按钮永久 disabled ([#44](https://github.com/donghao95/TryCue/issues/44)) ([0e93b07](https://github.com/donghao95/TryCue/commit/0e93b07767c95ff16ae7ca79798459f1cab4783a))
+* **web:** 修复观众计划 SSE 终态事件的 stale 边界场景 ([#46](https://github.com/donghao95/TryCue/issues/46)) ([cf6200a](https://github.com/donghao95/TryCue/commit/cf6200a2b71033269d25cf9df4ebe6aca821238f))
+* 修复代码审查发现的状态机、幂等性和鉴权回滚问题 ([#47](https://github.com/donghao95/TryCue/issues/47)) ([7374113](https://github.com/donghao95/TryCue/commit/737411354b5d1884eeb158cadfe8d59cc2406362))
+
 ## [0.1.2](https://github.com/donghao95/TryCue/compare/v0.1.1...v0.1.2) (2026-07-01)
 
 

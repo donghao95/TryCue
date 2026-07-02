@@ -1,6 +1,6 @@
 {
   "name": "trycue",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "private": true,
   "description": "AI 内容试映工作台：在真正发布前，把内容交给一组 AI 观众试映。",
   "license": "Apache-2.0",
