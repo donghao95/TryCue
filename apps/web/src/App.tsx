@@ -1594,10 +1594,20 @@ export function App() {
       progress: progressOk ? progressResponse.data : current.runId === id ? current.progress : null
     }));
     if (planOk && planResponse.data.plan) {
-      setAudiencePlanFailureMessage("");
+      const planStatus = planResponse.data.plan.status;
+      const isPlanConfirmed = Boolean(planResponse.data.plan.confirmedAt);
+      // 只在 plan 处于 ready_for_review 或已确认时清 failureMessage;
+      // failed/planning 状态保留 SSE failed 事件设置的详细错误,避免被 reload 覆盖
+      if (planStatus === "ready_for_review" || isPlanConfirmed) {
+        setAudiencePlanFailureMessage("");
+      }
+      // phase 决策:已确认 → 保留 current.phase;ready_for_review → plan_ready;
+      // planning/failed → 保留 current.phase(SSE 终态事件已设 plan_failed,reload 不应覆盖)
       commitAudiencePreparationUi((current) => ({
         runId: id,
-        phase: planResponse.data.plan?.confirmedAt ? current.phase : "plan_ready",
+        phase: isPlanConfirmed ? current.phase
+          : planStatus === "ready_for_review" ? "plan_ready"
+          : current.phase,
         planJobId: null,
         reasoningTokens: 0,
         reasoningEstimated: true
@@ -1641,7 +1651,8 @@ export function App() {
           setUiStatus(progressResponse.data.status === "ready_for_review" ? "planning_audience" : "generating_audience");
         } else if (planOk && !planResponse.data.plan && !nextActiveJob) {
           setUiStatus("planning_audience");
-          setAudiencePlanFailureMessage(t("audienceGen.toast.planFailed"));
+          // 保留 SSE failed 事件已设置的详细错误消息;只在没有任何 failureMessage 时才用 generic 兜底
+          setAudiencePlanFailureMessage((current) => current || t("audienceGen.toast.planFailed"));
         }
       }
     }
@@ -2585,7 +2596,12 @@ export function App() {
     }
 
     if (typeof event.job === "object" && event.job) {
-      setActiveGenerationJob(event.job as AudienceGenerationJob);
+      // 只用 active job 事件推进 activeGenerationJob;终态事件(active=false)交给下方
+      // 对应终态分支用 id 守护处理,避免 stale 终态 job 覆盖当前 active 的更新 job。
+      const incomingJob = event.job as AudienceGenerationJob;
+      if (incomingJob.active) {
+        setActiveGenerationJob(incomingJob);
+      }
     }
     if (event.type === "audience.generation.job.started") {
       setUiStatus((event.scope ?? (event.job as AudienceGenerationJob | undefined)?.scope) === "sampling_plan" ? "planning_audience" : "generating_audience");
@@ -2665,8 +2681,15 @@ export function App() {
           commitAudiencePreparationUi((current) => ({ ...current, phase: "plan_failed" }));
         }
       } else if (typeof event.message === "string" && eventScope === "sampling_plan") {
-        // 守卫失败时仍同步 failureMessage(后端事实),但不弹 toast(避免旧事件迟到打扰用户)
-        setAudiencePlanFailureMessage(event.message);
+        // 守卫失败 = 旧 plan failure 迟到。只在当前没有更新的 plan job 在跑时才同步 failureMessage,
+        // 否则会用旧 failure 污染新 plan UI(新 plan 还在 planning,却显示成 failed)。
+        // 检查 planJobId + phase:plan_requesting 表示已发起新 plan 但 job 未绑定,也应拒绝旧 failure
+        const currentPlanUi = audiencePreparationUiRef.current;
+        const hasNewerPlanJob = Boolean(currentPlanUi.planJobId && currentPlanUi.planJobId !== eventJobId)
+          || currentPlanUi.phase === "plan_requesting";
+        if (!hasNewerPlanJob) {
+          setAudiencePlanFailureMessage(event.message);
+        }
       }
       void loadAudienceState(eventRunId);
     }
