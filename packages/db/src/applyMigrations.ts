@@ -5,9 +5,10 @@ import { createHash, randomUUID } from "node:crypto";
 import Database from "better-sqlite3";
 
 // DATABASE_URL 通过 env.ts 从 .env.local / .env 加载。
-// 未设置时回退到默认开发库（与 .env.example 一致），避免没建 .env.local 时崩溃。
+// 未设置（undefined）或空字符串时回退到默认开发库（与 .env.example 一致），避免没建 .env.local 时崩溃。
 // test:integration 脚本会用 cross-env 显式覆盖为 trycue_test.db，不受影响。
-const databaseUrl = process.env.DATABASE_URL ?? "file:./data/trycue.db";
+// 注意用 || 而非 ??：空字符串 "" 也应回退（?? 只处理 undefined，空串会原样传递导致路径解析错误）。
+const databaseUrl = process.env.DATABASE_URL?.trim() || "file:./data/trycue.db";
 
 // Parse file: URL → absolute path
 // file:./data/trycue.db → resolve relative to workspace root

@@ -134,3 +134,22 @@ docs(api): 补充 report regenerated 事件契约
 ## 开源边界
 
 TryCue 是开源核心项目，仓库不包含真实 API Key、真实用户数据、生产部署配置、内部审查记录或未公开路线图。贡献内容不应引入这些敏感信息。
+
+## CI 与发版（Fork 用户注意）
+
+本仓库使用 [release-please](https://github.com/googleapis/release-please) 自动维护版本号和 GitHub Release，并依赖 `release-please.yml` 中的 **PAT**（Personal Access Token）触发 Docker 镜像构建。
+
+**Fork 后需手动配置 Secret 才能启用自动发版：**
+
+1. 前往 [GitHub Developer Settings → Fine-grained tokens](https://github.com/settings/tokens?type=beta)
+2. 创建新的 Fine-grained PAT：
+   - Token name: `GH_PAT`（或任意名称）
+   - Expiration: 选择合理期限（建议 1 年）
+   - Repository access: 仅限此 fork 仓库
+   - Permissions → Repository permissions:
+     - **Contents**: Read and write
+     - **Actions**: Read and write
+     - **Workflows**: Write
+3. 在 Fork 仓库的 Settings → Secrets and variables → Actions 中创建名为 `GH_PAT` 的 Secret，粘贴上一步生成的 token
+
+配置后，合并到 main 分支的 PR 将自动触发 release-please 工作流，打 tag 后自动构建 Docker 镜像推送到你的 GHCR。

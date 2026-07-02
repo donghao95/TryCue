@@ -689,6 +689,23 @@ export class RunService {
       return;
     }
     const plan = await tx.audienceSamplingPlan.findUnique({ where: { runId } }).catch(() => null);
+    // 孤儿检测：plan.status="planning" 但无 activeJob（sampling plan job 已 failed/canceled 但 plan 卡在 planning）。
+    // 修正为 "failed"，避免前端 buildAudienceGenerationProgress 返回 status="planning" 导致刷新后 phase=idle。
+    // 正常流程中 plan.status="planning" 时 sampling plan job 仍在跑，activeJob 必然存在，不会进入此分支。
+    if (plan && plan.status === "planning") {
+      await tx.audienceSamplingPlan.update({
+        where: { id: plan.id },
+        data: { status: "failed", errorMessage: message ?? plan.errorMessage ?? "观众采样计划生成中断" }
+      });
+      // 与下方 generating_audience 分支风格一致：run 已在 planning_audience 但有新 message 时仍需更新 errorMessage
+      if (run.status !== "planning_audience" || message) {
+        await tx.testRun.update({
+          where: { id: runId },
+          data: { status: "planning_audience", errorMessage: message ?? run.errorMessage ?? null }
+        });
+      }
+      return;
+    }
     const [totalCount, readyCount, failedCount] = await Promise.all([
       tx.audienceProfile.count({ where: { runId } }),
       tx.audienceProfile.count({ where: { runId, identityStatus: "identity_ready" } }),
@@ -1355,6 +1372,8 @@ export class RunService {
     return this.withAudienceConfirmationLock(runId, () => this.confirmAudienceSamplingPlanLocked(runId));
   }
 
+  // 进程内串行化锁，防止同一 run 的并发 confirm 请求交错。
+  // 约束：仅在单进程部署下生效（V1 默认）。多进程/多实例部署需改用分布式锁（如 Redis）。
   private async withAudienceConfirmationLock<T>(runId: string, fn: () => Promise<T>) {
     const previous = this.audienceConfirmationLocks.get(runId) ?? Promise.resolve();
     let release!: () => void;

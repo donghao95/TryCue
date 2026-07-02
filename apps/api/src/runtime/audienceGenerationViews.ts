@@ -226,6 +226,7 @@ export function samplingPlanView(plan: {
     expansionStatus: string;
     expansionError: string | null;
   }>;
+  errorMessage: string | null;
 }): AudienceSamplingPlanView {
   const directives = plan.directives.map((directive) => ({
     id: directive.id,
@@ -249,7 +250,8 @@ export function samplingPlanView(plan: {
     dimensions: jsonStringArray(plan.dimensionsJson),
     confirmedAt: plan.confirmedAt?.toISOString() ?? null,
     directives,
-    validation: samplingPlanValidation(plan.totalCount, plan.directives)
+    validation: samplingPlanValidation(plan.totalCount, plan.directives),
+    errorMessage: plan.errorMessage
   };
 }
 
