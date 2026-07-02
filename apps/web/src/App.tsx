@@ -2634,11 +2634,17 @@ export function App() {
     if (event.type === "audience.generation.job.completed") {
       const eventJobId = typeof event.jobId === "string" ? event.jobId : null;
       const eventScope = event.scope ?? (event.job as AudienceGenerationJob | undefined)?.scope;
-      if (eventScope === "sampling_plan" && !isCurrentPlanGenerationJob(eventJobId)) return;
-      setActiveGenerationJob(null);
-      setIsGeneratingAll(false);
-      if (eventScope === "sampling_plan") {
-        commitAudiencePreparationUi((current) => ({ ...current, phase: "plan_streaming" }));
+      // 终态事件守卫失败(典型:刷新后跨会话恢复、planJobId 未绑定)时不能直接 return,
+      // 否则 samplingPlan 不会重新同步,导致"确认计划"按钮永久 disabled。
+      // 守卫失败时不推进 phase(非当前会话发起的 job),但仍从后端重新同步事实。
+      const isCurrentPlanJob = eventScope !== "sampling_plan" || isCurrentPlanGenerationJob(eventJobId);
+      // 只清与事件 job 匹配的 activeGenerationJob,避免旧终态事件迟到时误清新 job
+      setActiveGenerationJob((current) => current?.id === eventJobId ? null : current);
+      if (isCurrentPlanJob) {
+        setIsGeneratingAll(false);
+        if (eventScope === "sampling_plan") {
+          commitAudiencePreparationUi((current) => ({ ...current, phase: "plan_streaming" }));
+        }
       }
       void loadAudienceState(eventRunId);
     }
@@ -2647,26 +2653,35 @@ export function App() {
       const eventScope = event.type === "audience.plan.failed"
         ? "sampling_plan"
         : event.scope ?? (event.job as AudienceGenerationJob | undefined)?.scope;
-      if (eventScope === "sampling_plan" && !isCurrentPlanGenerationJob(eventJobId)) return;
-      setActiveGenerationJob(null);
-      setIsGeneratingAll(false);
-      if (typeof event.message === "string") {
-        if (eventScope === "sampling_plan") setAudiencePlanFailureMessage(event.message);
-        showAppError(event.message);
+      const isCurrentPlanJob = eventScope !== "sampling_plan" || isCurrentPlanGenerationJob(eventJobId);
+      setActiveGenerationJob((current) => current?.id === eventJobId ? null : current);
+      if (isCurrentPlanJob) {
+        setIsGeneratingAll(false);
+        if (typeof event.message === "string") {
+          if (eventScope === "sampling_plan") setAudiencePlanFailureMessage(event.message);
+          showAppError(event.message);
+        }
+        if (eventScope === "sampling_plan") {
+          commitAudiencePreparationUi((current) => ({ ...current, phase: "plan_failed" }));
+        }
+      } else if (typeof event.message === "string" && eventScope === "sampling_plan") {
+        // 守卫失败时仍同步 failureMessage(后端事实),但不弹 toast(避免旧事件迟到打扰用户)
+        setAudiencePlanFailureMessage(event.message);
       }
-      if (eventScope === "sampling_plan") {
-        commitAudiencePreparationUi((current) => ({ ...current, phase: "plan_failed" }));
-      }
+      void loadAudienceState(eventRunId);
     }
     if (event.type === "audience.generation.job.canceled") {
       const eventJobId = typeof event.jobId === "string" ? event.jobId : null;
       const eventScope = event.scope ?? (event.job as AudienceGenerationJob | undefined)?.scope;
-      if (eventScope === "sampling_plan" && !isCurrentPlanGenerationJob(eventJobId)) return;
-      setActiveGenerationJob(null);
-      setIsGeneratingAll(false);
-      if (eventScope === "sampling_plan") {
-        commitAudiencePreparationUi((current) => ({ ...current, phase: "plan_failed" }));
+      const isCurrentPlanJob = eventScope !== "sampling_plan" || isCurrentPlanGenerationJob(eventJobId);
+      setActiveGenerationJob((current) => current?.id === eventJobId ? null : current);
+      if (isCurrentPlanJob) {
+        setIsGeneratingAll(false);
+        if (eventScope === "sampling_plan") {
+          commitAudiencePreparationUi((current) => ({ ...current, phase: "plan_failed" }));
+        }
       }
+      void loadAudienceState(eventRunId);
     }
 
     if (event.type === "post_state.updated") setPostState((current) => mergePostState(current, event.postState as PostStateView));
@@ -2780,17 +2795,24 @@ export function App() {
     }
     if (event.type === "audience.plan.ready") {
       const eventJobId = typeof event.jobId === "string" ? event.jobId : null;
-      if (!isCurrentPlanGenerationJob(eventJobId)) return;
-      setAudiencePlanPreview(null);
-      setAudiencePlanFailureMessage("");
-      commitAudiencePreparationUi({
-        runId: eventRunId,
-        phase: "plan_ready",
-        planJobId: null,
-        reasoningTokens: 0,
-        reasoningEstimated: true
-      });
-      setUiStatus("planning_audience");
+      const isCurrentPlanJob = isCurrentPlanGenerationJob(eventJobId);
+      // plan.ready 没有 event.job 字段,L2587 的通用 job 更新不触发,需要显式清;
+      // 但只在 activeJob 与事件 job 匹配时才清,避免旧事件迟到误清新 job
+      setActiveGenerationJob((current) => current?.id === eventJobId ? null : current);
+      if (isCurrentPlanJob) {
+        setIsGeneratingAll(false);
+        setAudiencePlanPreview(null);
+        setAudiencePlanFailureMessage("");
+        commitAudiencePreparationUi({
+          runId: eventRunId,
+          phase: "plan_ready",
+          planJobId: null,
+          reasoningTokens: 0,
+          reasoningEstimated: true
+        });
+        setUiStatus("planning_audience");
+      }
+      // 终态事件总是从后端重新同步事实(phase 会由 loadAudienceState 基于后端 plan 状态收敛)
       void loadAudienceState(eventRunId);
     }
     if (event.type === "audience.plan.updated") {
