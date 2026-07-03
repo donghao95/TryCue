@@ -37,6 +37,37 @@ import type {
 import { ReportOutputSchema, EvidencePackSchema } from "@trycue/shared/report";
 import { runClockSnapshot } from "./runtime/clock.js";
 
+/**
+ * Shared keyword lists for risk-tag inference. Used by three call sites that
+ * must stay in sync to avoid drift:
+ * - {@link inferRiskTags} (toolCommitHelpers.ts) — agent thought / tool log
+ * - {@link buildSummaryView} trustConcernCount / adConcernCount — comment aggregate
+ * - {@link inferCommentRiskTag} — single comment
+ *
+ * Scope note: {@link inferCommentType} and {@link inferCommentSentiment} below
+ * also use "广" for ad-like detection, but they produce commentType/sentiment
+ * (not riskTag) and are intentionally NOT unified here — different dimension,
+ * different consumers.
+ *
+ * Design notes (收紧 rationale):
+ * - "具体" removed: too common in neutral contexts ("具体来说", "想看具体的");
+ *   "不够具体" is about detail-level, not trust.
+ * - "真的" removed: ambiguous ("真的有用" is positive). "真实吗"/"可信吗" are
+ *   unambiguous doubt markers.
+ * - "型号" removed: product-category-specific, not a general trust signal.
+ *   Known trade-off: "型号靠谱吗" (a real doubt) will be missed; accepted as
+ *   narrower than the false-positive cost of keeping "型号".
+ * - "来源"/"依据" kept: in thought/comment text these predominantly appear in
+ *   questioning contexts ("来源不明", "有什么依据"). "依据" also covers the
+ *   "要求证据" semantic, so "证据" is not added separately — "证据" alone
+ *   false-positives on "证据充分/翔实/扎实" (positive evaluations).
+ * - "真实吗"/"可信吗" added: explicit credibility-questioning markers.
+ * - Single-char "广" removed from ad_concern: matches "广泛" etc. and double-counts
+ *   with "广告" in countMatches. "广告"/"软广" are unambiguous.
+ */
+export const TRUST_EVIDENCE_KEYWORDS = ["来源", "依据", "真实吗", "可信吗"] as const;
+export const AD_CONCERN_KEYWORDS = ["广告", "软广"] as const;
+
 export function postStateView(state: SimulatedPostState, viewerState?: Pick<PostStateView, "likedByMe" | "favoritedByMe" | "sharedByMe">): PostStateView {
   return {
     exposureCount: state.exposureCount,
@@ -303,13 +334,13 @@ export async function buildSummaryView(params: {
     likedCount: params.postState?.likeCount ?? 0,
     favoritedCount: params.postState?.favoriteCount ?? 0,
     commentedCount: params.postState?.commentCount ?? 0,
-    trustConcernCount: countMatches(text, ["依据", "真实吗", "真的", "具体", "来源"]),
-    adConcernCount: countMatches(text, ["广", "广告", "软广"]),
+    trustConcernCount: countMatches(text, TRUST_EVIDENCE_KEYWORDS),
+    adConcernCount: countMatches(text, AD_CONCERN_KEYWORDS),
     questionCount: countMatches(text, ["吗", "？", "?", "求", "蹲"])
   };
 }
 
-function countMatches(value: string, words: string[]): number {
+function countMatches(value: string, words: readonly string[]): number {
   return words.reduce((count, word) => count + (value.includes(word) ? 1 : 0), 0);
 }
 
@@ -546,8 +577,8 @@ function inferCommentSentiment(text: string) {
 }
 
 function inferCommentRiskTag(text: string) {
-  if (text.includes("广") || text.includes("广告")) return "ad_concern";
-  if (text.includes("具体") || text.includes("来源") || text.includes("型号")) return "trust_evidence";
+  if (AD_CONCERN_KEYWORDS.some((kw) => text.includes(kw))) return "ad_concern";
+  if (TRUST_EVIDENCE_KEYWORDS.some((kw) => text.includes(kw))) return "trust_evidence";
   return undefined;
 }
 

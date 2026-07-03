@@ -2,7 +2,7 @@ import type { AgentTurn, AgentJourney, RunParticipant, SimulatedPostState, Journ
 import type { ToolName } from "@trycue/shared/tool";
 import type { LiveEventEnvelope } from "@trycue/shared/live-events";
 import { recordLiveEvent } from "../liveEvents.js";
-import { logView, postStateView, deriveSeatStatus } from "../views.js";
+import { logView, postStateView, deriveSeatStatus, TRUST_EVIDENCE_KEYWORDS, AD_CONCERN_KEYWORDS } from "../views.js";
 
 export async function commitToolLog(
   tx: Prisma.TransactionClient,
@@ -142,8 +142,8 @@ export async function commitAudienceEvents(
 
 export function inferRiskTags(text: string): string[] {
   const tags: string[] = [];
-  if (text.includes("广告")) tags.push("ad_concern");
-  if (text.includes("具体") || text.includes("来源") || text.includes("依据")) tags.push("trust_evidence");
+  if (AD_CONCERN_KEYWORDS.some((kw) => text.includes(kw))) tags.push("ad_concern");
+  if (TRUST_EVIDENCE_KEYWORDS.some((kw) => text.includes(kw))) tags.push("trust_evidence");
   return tags;
 }
 
