@@ -1011,6 +1011,10 @@ export function App() {
   const navigationGuardConfirmedRef = useRef(false);
   useEffect(() => {
     const isDirty = () => {
+      if (route.kind === "workbench" && !route.runId) {
+        // 新建页：有未保存草稿
+        return isMeaningfulCreateDraft(currentCreateDraft);
+      }
       if (route.kind === "workbench" && route.runId && isAudienceStage) {
         // 观众生成页：编辑态
         return Boolean(editingDirectiveId);
@@ -1034,7 +1038,7 @@ export function App() {
     });
     const unregister = navigationGuard.register({ isDirty, confirm });
     return unregister;
-  }, [route, editingDirectiveId, isAudienceStage, navigationGuard]);
+  }, [route, editingDirectiveId, isAudienceStage, navigationGuard, currentCreateDraft]);
 
   const isAudienceGenerationActive = Boolean(activeGenerationJob?.active && ["queued", "planning", "generating"].includes(activeGenerationJob.status));
   const isPlanGenerationActive = isAudienceGenerationActive && activeGenerationJob?.scope === "sampling_plan";

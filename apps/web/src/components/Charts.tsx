@@ -88,7 +88,7 @@ function FunnelChart({ funnel }: { funnel: FunnelCard }) {
               </div>
               <div className="funnelRowValue">
                 <span className="funnelCount">{stage.count} {peopleUnit}/{total} {peopleUnit}</span>
-                <span className="funnelPercent">{sharePct.toFixed(0)}%</span>
+                <span className="funnelPercent">{sharePct > 0 && sharePct < 1 ? "<1%" : `${sharePct.toFixed(0)}%`}</span>
                 {stage.key === "commentedActors" ? (
                   <span className="funnelEventCount">{t("report.chart.funnel.commentEvents", { count: funnel.commentEvents })}</span>
                 ) : null}
@@ -172,7 +172,7 @@ function ReadDepthChart({ funnel }: { funnel: FunnelCard }) {
               </div>
               <div className="hBarRowValue">
                 <span className="hBarCount">{item.count} {peopleUnit}/{total} {peopleUnit}</span>
-                <span className="hBarPercent">{sharePct.toFixed(0)}%</span>
+                <span className="hBarPercent">{sharePct > 0 && sharePct < 1 ? "<1%" : `${sharePct.toFixed(0)}%`}</span>
               </div>
             </div>
           );

@@ -81,19 +81,6 @@ export function audienceProfileLabel(audience: AudienceDraft) {
   return audience.samplingLabel;
 }
 
-// 匹配后端采样标签的中文格式（"标签：内容" / "避免与同组其他观众重复"）。
-// 后端采样标签始终是中文，所以这里不随 i18n locale 切换。
-function cleanAudienceSummary(value: string) {
-  return value
-    .replace(/^.+?：/, "")
-    .replace(/，?避免与同组其他观众重复/g, "")
-    .replace(/\s*\/\s*/g, " / ")
-    .split(" / ")
-    .map((part) => part.trim())
-    .filter((part) => part && !/^mock-\d+$/i.test(part))
-    .join(" / ");
-}
-
 export function consoleFilterLabel(value: string) {
   const key = `console.filter.${value}`;
   const translated = i18n.t(key);

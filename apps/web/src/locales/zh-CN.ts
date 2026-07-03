@@ -404,6 +404,7 @@ export const zhCN = {
       empty: "暂无证据",
       openDrawer: "查看证据",
       closeDrawer: "关闭",
+      notFound: "未找到该证据，可能已被更新或移除。",
       typeMetric: "指标",
       typeThought: "想法",
       typeComment: "评论",

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { AlertTriangle, CheckCircle2, FileText, History, Home, Loader2, Send, Trash2, X } from "lucide-react";
 import type { RunHistoryItem } from "@trycue/shared/run";
@@ -18,6 +18,7 @@ export function HistoryRoute({
   const { t } = useTranslation();
   const [runs, setRuns] = useState<RunHistoryItem[]>([]);
   const [cursor, setCursor] = useState<number | null>(0);
+  const cursorRef = useRef<number | null>(0);
   const [loading, setLoading] = useState(true);
   const [toast, setToast] = useState<{ tone: "error" | "success"; text: string } | null>(null);
   const [deletingRunId, setDeletingRunId] = useState<string | null>(null);
@@ -34,7 +35,7 @@ export function HistoryRoute({
   }, [toast]);
 
   async function loadRuns(reset = false) {
-    const nextCursor = reset ? 0 : cursor;
+    const nextCursor = reset ? 0 : cursorRef.current;
     if (nextCursor === null) return;
     setLoading(true);
     setToast(null);
@@ -46,6 +47,7 @@ export function HistoryRoute({
     }
     setRuns((current) => reset ? response.data.runs : mergeHistoryRuns(current, response.data.runs));
     setCursor(response.data.nextCursor);
+    cursorRef.current = response.data.nextCursor;
   }
 
   async function deleteRun(run: RunHistoryItem) {

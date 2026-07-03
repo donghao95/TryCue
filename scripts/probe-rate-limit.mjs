@@ -31,26 +31,44 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const projectRoot = resolve(__dirname, "..");
 
 // ── Simple YAML parser (good enough for llm.local.yaml) ──
+// Supports up to two levels of nesting via indentation, covering:
+//   models:            → obj.models
+//     fast: xxx        → obj.models.fast
+//   capacity:          → obj.capacity
+//     shared:          → obj.capacity.shared
+//       maxRpm: 60     → obj.capacity.shared.maxRpm
 function parseSimpleYaml(raw) {
   const obj = {};
   let currentNested = null;
+  let currentDeepNested = null;
   for (const line of raw.split("\n")) {
     const trimmed = line.trim();
     if (!trimmed || trimmed.startsWith("#")) continue;
-    const nestedMatch = trimmed.match(/^(\w+):$/);
-    if (nestedMatch) {
-      currentNested = nestedMatch[1];
-      obj[currentNested] = {};
+    const indent = line.length - line.trimStart().length;
+    // Header (key with no value): starts a nesting block
+    if (/^\w+:\s*$/.test(trimmed)) {
+      const key = trimmed.replace(/:\s*$/, "");
+      if (indent === 0) {
+        currentNested = key;
+        currentDeepNested = null;
+        obj[currentNested] = {};
+      } else if (indent >= 2 && currentNested) {
+        currentDeepNested = key;
+        obj[currentNested][currentDeepNested] = {};
+      }
       continue;
     }
     const kvMatch = trimmed.match(/^(\w+):\s*(.+)$/);
     if (kvMatch) {
       const [, key, val] = kvMatch;
       const cleanVal = val.replace(/^["']|["']$/g, "");
-      if (currentNested && line.startsWith("  ")) {
+      if (indent >= 4 && currentNested && currentDeepNested) {
+        obj[currentNested][currentDeepNested][key] = cleanVal;
+      } else if (indent >= 2 && currentNested) {
         obj[currentNested][key] = cleanVal;
       } else {
         currentNested = null;
+        currentDeepNested = null;
         obj[key] = cleanVal;
       }
     }

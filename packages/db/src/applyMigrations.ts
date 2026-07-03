@@ -1,6 +1,6 @@
 import "./env.js";
 import { readdirSync, readFileSync, mkdirSync } from "node:fs";
-import { join, resolve, dirname } from "node:path";
+import { join, resolve, dirname, basename } from "node:path";
 import { createHash, randomUUID } from "node:crypto";
 import Database from "better-sqlite3";
 
@@ -11,7 +11,9 @@ import Database from "better-sqlite3";
 const databaseUrl = process.env.DATABASE_URL?.trim() || "file:./data/trycue.db";
 
 // Parse file: URL → absolute path
-// file:./data/trycue.db → resolve relative to workspace root
+// file:./data/trycue.db → resolve relative to the Prisma schema directory
+// (packages/db/prisma/), same as Prisma client. Actual file lands at
+// packages/db/prisma/data/trycue.db. See docs/09_部署与运维.md section 3.
 const rawPath = databaseUrl.startsWith("file:")
   ? databaseUrl.slice("file:".length)
   : databaseUrl;
@@ -83,11 +85,16 @@ try {
       // matching the project's dev/test naming convention, mirroring the test helper
       // in apps/api/src/tests/helpers.ts).
       const nodeEnv = process.env.NODE_ENV;
-      // 精确匹配已知的本地开发/测试库文件名，避免 `trycue_prod.db`、
-      // `trycue_staging.db` 等含 "trycue" 子串的非 dev 库被误判为可重置。
+      // Fail-closed: require BOTH the resolved file name and the resolved
+      // directory to match the project's dev/test data dir. A bare basename
+      // check would wrongly allow `file:C:/elsewhere/trycue.db`. normalizedPath
+      // is resolved against the Prisma schema dir, so this also rejects paths
+      // that escape packages/db/prisma/data/.
+      const allowedDataDir = resolve(schemaDir, "data");
+      const dbFileName = basename(normalizedPath);
       const isKnownDevOrTestDb =
-        databaseUrl.includes("trycue.db") ||
-        databaseUrl.includes("trycue_test.db");
+        (dbFileName === "trycue.db" || dbFileName === "trycue_test.db") &&
+        dirname(normalizedPath) === allowedDataDir;
       if (nodeEnv === "production" || !isKnownDevOrTestDb) {
         throw new Error(
           "Refusing to drop tables outside local dev/test. Use `prisma migrate deploy` in production."
