@@ -280,7 +280,7 @@ export function audienceRoutes(deps: AudienceRoutesDeps): FastifyPluginAsync {
 /**
  * Detect whether an action log's risk tags contain a doubt risk.
  * "doubt" is a general concept covering both ad_concern (广告嫌疑) and
- * trust_evidence (要求具体来源/依据) — both indicate the audience is
+ * trust_evidence (要求来源/依据) — both indicate the audience is
  * questioning the content and should trigger the hesitating seat status.
  */
 function hasDoubtRisk(tags: unknown) {
