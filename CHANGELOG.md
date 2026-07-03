@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.1.4](https://github.com/donghao95/TryCue/compare/v0.1.3...v0.1.4) (2026-07-03)
+
+
+### Bug Fixes
+
+* **api:** 修复 recovery guard 的 await-before-assignment 窗口 ([#53](https://github.com/donghao95/TryCue/issues/53)) ([870e405](https://github.com/donghao95/TryCue/commit/870e405eec2db06570c120c27d0100d1783e365f))
+* 修复代码审查第二轮发现的状态机并发、文档一致性和工程问题 ([#51](https://github.com/donghao95/TryCue/issues/51)) ([a9e1db9](https://github.com/donghao95/TryCue/commit/a9e1db906a6cdb2fe3977ee71cafcd322cfa001b))
+
+
+### Performance Improvements
+
+* **docs:** 将 README 截图转为 WebP，体积减少 82% ([#48](https://github.com/donghao95/TryCue/issues/48)) ([ca8fa8b](https://github.com/donghao95/TryCue/commit/ca8fa8bf48767b2ef27fa70e5432e1a781029f5e))
+
 ## [0.1.3](https://github.com/donghao95/TryCue/compare/v0.1.2...v0.1.3) (2026-07-02)
 
 
