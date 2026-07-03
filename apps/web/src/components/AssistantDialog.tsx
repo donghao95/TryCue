@@ -93,6 +93,18 @@ export function AssistantDialog({
     textarea.style.height = `${textarea.scrollHeight}px`;
   }, [draft]);
 
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        e.preventDefault();
+        onClose();
+      }
+    };
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  }, [isOpen, onClose]);
+
   if (!isOpen) return null;
 
   function handleDraftChange(value: string, caretIndex?: number) {
@@ -252,6 +264,7 @@ function SuggestionCard({
   onApplyOperation: (messageId: string, operationId: string) => void;
   onApplyAll: (messageId: string) => void;
 }) {
+  const { t } = useTranslation();
   const proposal = message.proposal;
   if (!proposal) return null;
   const operations = proposal.operations as AssistantOperation[];
@@ -265,13 +278,13 @@ function SuggestionCard({
         <div>
           <strong>{proposal.summary}</strong>
           {"totalCountChange" in proposal && proposal.totalCountChange ? (
-            <span>{proposal.totalCountChange.before} → {proposal.totalCountChange.after} {i18n.t("assistant.diff.people")}</span>
+            <span>{proposal.totalCountChange.before} → {proposal.totalCountChange.after} {t("assistant.diff.people")}</span>
           ) : null}
         </div>
         {operations.length && hasApplicableOperation ? (
           <button className="ghostButton iconTextButton" type="button" onClick={() => onApplyAll(message.id)} disabled={isApplying}>
             {isApplying ? <Loader2 className="spin" size={14} /> : <CheckCircle2 size={14} />}
-            {i18n.t("assistant.applyAll")}
+            {t("assistant.applyAll")}
           </button>
         ) : null}
       </div>
@@ -292,7 +305,7 @@ function SuggestionCard({
             />
           ))}
         </div>
-      ) : <p className="suggestionDiscussionOnly">{i18n.t("assistant.discussionOnly")}</p>}
+      ) : <p className="suggestionDiscussionOnly">{t("assistant.discussionOnly")}</p>}
     </section>
   );
 }
@@ -308,6 +321,7 @@ function OperationRow({
   state: AssistantOperationState;
   onApply: () => void;
 }) {
+  const { t } = useTranslation();
   const statusText = operationStatusText(state.status);
   return (
     <article className={`suggestionOperation state-${state.status}`}>
@@ -324,7 +338,7 @@ function OperationRow({
       <div className="operationActions">
         <button className="ghostButton iconTextButton" type="button" onClick={onApply} disabled={state.status === "running" || state.status === "success" || state.status === "not_applicable"}>
           {state.status === "running" ? <Loader2 className="spin" size={13} /> : <CheckCircle2 size={13} />}
-          {i18n.t("assistant.apply")}
+          {t("assistant.apply")}
         </button>
       </div>
     </article>
@@ -332,13 +346,14 @@ function OperationRow({
 }
 
 function OperationDiff({ operation }: { operation: AssistantOperation }) {
+  const { t } = useTranslation();
   if (operation.op === "add_directive") {
     return <DiffRows rows={[
-      [i18n.t("assistant.field.name"), "", operation.directive.name],
-      [i18n.t("assistant.field.quantity"), "", operation.directive.quantity],
-      [i18n.t("assistant.field.description"), "", operation.directive.description],
-      [i18n.t("assistant.field.diversityAxes"), "", operation.directive.diversityAxes],
-      [i18n.t("assistant.field.rationale"), "", operation.directive.rationale]
+      [t("assistant.field.name"), "", operation.directive.name],
+      [t("assistant.field.quantity"), "", operation.directive.quantity],
+      [t("assistant.field.description"), "", operation.directive.description],
+      [t("assistant.field.diversityAxes"), "", operation.directive.diversityAxes],
+      [t("assistant.field.rationale"), "", operation.directive.rationale]
     ]} />;
   }
   if (operation.op === "update_directive" || operation.op === "update_identity") {
@@ -346,27 +361,28 @@ function OperationDiff({ operation }: { operation: AssistantOperation }) {
     return <DiffRows rows={Object.entries(operation.patch).map(([field, value]) => [fieldLabel(field), before[field], value])} />;
   }
   if (operation.op === "favorite_identity") {
-    return <DiffRows rows={[[i18n.t("assistant.diff.favoriteLabel"), "", operation.favorited ? i18n.t("assistant.diff.favorite") : i18n.t("assistant.diff.unfavorite")]]} />;
+    return <DiffRows rows={[[t("assistant.diff.favoriteLabel"), "", operation.favorited ? t("assistant.diff.favorite") : t("assistant.diff.unfavorite")]]} />;
   }
   if (operation.op === "add_profile") {
     const demographics = operation.demographics;
     const demoSummary = demographics ? [demographics.role, demographics.ageRange, demographics.cityTier].filter(Boolean).join("·") : "";
     return <DiffRows rows={[
-      [i18n.t("assistant.diff.samplingLabel"), "", operation.samplingLabel],
-      [i18n.t("assistant.diff.demographics"), "", demoSummary || i18n.t("assistant.diff.demographicsEmpty")]
+      [t("assistant.diff.samplingLabel"), "", operation.samplingLabel],
+      [t("assistant.diff.demographics"), "", demoSummary || t("assistant.diff.demographicsEmpty")]
     ]} />;
   }
   return null;
 }
 
 function DiffRows({ rows }: { rows: Array<[string, unknown, unknown]> }) {
+  const { t } = useTranslation();
   if (!rows.length) return null;
   return (
     <div className="operationDiff">
       {rows.map(([field, before, after]) => (
         <div className="operationDiffRow" key={field}>
           <span>{field}</span>
-          <code>{formatValue(before) || i18n.t("assistant.diff.emptyValue")}</code>
+          <code>{formatValue(before) || t("assistant.diff.emptyValue")}</code>
           <strong>{formatValue(after)}</strong>
         </div>
       ))}

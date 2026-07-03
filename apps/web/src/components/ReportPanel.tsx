@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import type { ReportView } from "@trycue/shared/run";
 import type {
   ReportOutput,
@@ -57,7 +57,9 @@ function affectedSegmentLabel(t: (k: string) => string, value: SegmentKey | "ove
 
 function formatPercent(value: number | null | undefined): string {
   if (value == null) return "—";
-  return `${(value * 100).toFixed(0)}%`;
+  const pct = value * 100;
+  if (pct > 0 && pct < 1) return "<1%";
+  return `${pct.toFixed(0)}%`;
 }
 
 function formatNumber(value: number | null | undefined): string {
@@ -101,7 +103,16 @@ function EvidenceDrawer({
   onClose: () => void;
 }) {
   const { t } = useTranslation();
-  if (!item) return null;
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        e.preventDefault();
+        onClose();
+      }
+    };
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  }, [onClose]);
   const typeLabelMap: Record<string, string> = {
     metric: t("report.evidence.typeMetric"),
     thought: t("report.evidence.typeThought"),
@@ -112,21 +123,31 @@ function EvidenceDrawer({
     blocker: t("report.evidence.typeBlocker"),
     group: t("report.evidence.typeGroup")
   };
-  const typeLabel = typeLabelMap[item.type] ?? item.type;
   return (
     <div className="evidenceDrawerOverlay" onClick={onClose} role="dialog" aria-modal="true" aria-label={t("report.evidence.drawerTitle")}>
       <div className="evidenceDrawer" onClick={(e) => e.stopPropagation()}>
-        <div className="evidenceDrawerHeader">
-          <span className="evidenceType">{typeLabel}</span>
-          <h4>{item.title}</h4>
-          <button type="button" className="ghostButton" onClick={onClose}>
-            {t("report.evidence.closeDrawer")}
-          </button>
-        </div>
-        <div className="evidenceDrawerBody">
-          <p className="evidenceContent">{item.content}</p>
-          {item.participantId ? <p className="evidenceMeta">{t("report.evidence.participant")}{t("common.labelSeparator")}{item.participantId}</p> : null}
-        </div>
+        {item ? (
+          <>
+            <div className="evidenceDrawerHeader">
+              <span className="evidenceType">{typeLabelMap[item.type] ?? item.type}</span>
+              <h4>{item.title}</h4>
+              <button type="button" className="ghostButton" onClick={onClose}>
+                {t("report.evidence.closeDrawer")}
+              </button>
+            </div>
+            <div className="evidenceDrawerBody">
+              <p className="evidenceContent">{item.content}</p>
+              {item.participantId ? <p className="evidenceMeta">{t("report.evidence.participant")}{t("common.labelSeparator")}{item.participantId}</p> : null}
+            </div>
+          </>
+        ) : (
+          <div className="evidenceDrawerHeader">
+            <p className="evidenceNotFound">{t("report.evidence.notFound")}</p>
+            <button type="button" className="ghostButton" onClick={onClose}>
+              {t("report.evidence.closeDrawer")}
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );
@@ -912,7 +933,7 @@ export function ReportPanel({ report, onRegenerate, isRegenerating }: ReportPane
       </section>
 
       {/* evidence drawer */}
-      <EvidenceDrawer item={activeItem} onClose={() => setActiveEvidenceId(null)} />
+      {activeEvidenceId ? <EvidenceDrawer item={activeItem} onClose={() => setActiveEvidenceId(null)} /> : null}
     </section>
   );
 }

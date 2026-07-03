@@ -23,6 +23,15 @@ param(
 
 $ErrorActionPreference = "Stop"
 
+# 检查 Docker 是否可用
+try {
+  docker info 2>&1 | Out-Null
+  if ($LASTEXITCODE -ne 0) { throw }
+} catch {
+  Write-Error "Docker is not running or not installed. Please start Docker Desktop and try again."
+  exit 1
+}
+
 $RepoRoot = Resolve-Path (Join-Path $PSScriptRoot "..")
 Set-Location $RepoRoot
 

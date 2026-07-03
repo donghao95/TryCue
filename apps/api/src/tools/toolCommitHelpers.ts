@@ -83,7 +83,8 @@ export async function commitAudienceEvents(
       runId: action.runId,
       contentVersionId: action.contentVersionId,
       participantId: action.participantId
-    }
+    },
+    select: { riskTagsJson: true }
   });
   const hasDoubt = audienceLogs.some((log) => hasDoubtRisk(log.riskTagsJson));
 
@@ -151,7 +152,7 @@ export function participantDisplayName(audience: RunParticipant): string {
 }
 
 function hasDoubtRisk(tags: unknown) {
-  return Array.isArray(tags) && tags.some((tag) => tag === "ad_concern");
+  return Array.isArray(tags) && tags.some((tag) => tag === "ad_concern" || tag === "trust_evidence");
 }
 
 function animationHintForExit(outcome?: JourneyExitOutcome | null): "risk" | "skip" | "none" {

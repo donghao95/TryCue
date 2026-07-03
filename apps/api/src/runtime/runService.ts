@@ -1994,9 +1994,12 @@ export class RunService {
     if (run.status === "pausing") return { runId, status: "pausing" };
     if (run.status !== "running") throw new ApiError("INVALID_RUN_STATUS", "只有运行中的试映才能暂停", 409);
     const configJson = objectRecord(run.configJson);
-    await prisma.testRun.update({ where: { id: runId }, data: { status: "pausing", configJson: { ...configJson, controlState: "pause_requested" } } });
-    const event = await recordLiveEvent(prisma, { runId, eventType: "run.pausing", payload: {} });
-    pushLiveEvent(runId, event);
+    const events = await prisma.$transaction(async (tx) => {
+      await tx.testRun.update({ where: { id: runId }, data: { status: "pausing", configJson: { ...configJson, controlState: "pause_requested" } } });
+      const pauseEvent = await recordLiveEvent(tx, { runId, eventType: "run.pausing", payload: {} });
+      return { pauseEvent };
+    });
+    pushLiveEvent(runId, events.pauseEvent);
     await this.writeRunLog(runId, "control", "用户请求暂停，已开始的观众将完成完整旅程后暂停");
     return { runId, status: "pausing" };
   }

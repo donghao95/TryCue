@@ -44,8 +44,7 @@ apps/api/uploads/*
 apps/api/src/evals/
 
 # Internal docs that should not be public
-docs/测试api key.txt
-docs/ChatGPT Image 2026年5月29日 17_56_12.png
+docs/code_review/
 
 # Claude / Codex / AI assistant internal artifacts
 .claude/

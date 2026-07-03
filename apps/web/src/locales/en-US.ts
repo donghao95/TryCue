@@ -404,6 +404,7 @@ export const enUS = {
       empty: "No evidence",
       openDrawer: "View evidence",
       closeDrawer: "Close",
+      notFound: "Evidence not found. It may have been updated or removed.",
       typeMetric: "Metric",
       typeThought: "Thought",
       typeComment: "Comment",

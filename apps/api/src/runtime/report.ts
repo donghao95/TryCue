@@ -256,9 +256,33 @@ export async function generateReportAndCompleteRun(
     };
   }
 
+  // Wrap the transaction so DB-level failures (e.g. SQLite write lock contention)
+  // also trigger pauseRunForReportFailure on the non-regenerate path — otherwise
+  // the run would be stuck in report_generating forever.
   const result = await prisma.$transaction(async (tx) => {
     const frozenClock = options?.preFrozenClock ?? freezeRunClockData(await tx.testRun.findUniqueOrThrow({ where: { id: runId } }));
     const completedSimulatedTime = Math.floor(frozenClock.clockElapsedMs / 1000);
+    // CAS (non-regenerate only): claim the report_generating → completed
+    // transition BEFORE any other writes. A concurrent loser that enters the
+    // transaction after the winner commits would otherwise overwrite report
+    // facts (upsert) before hitting the CAS guard. Placing the CAS first
+    // ensures count === 0 returns immediately, skipping report.upsert,
+    // simulatedPostState.update, and event writes. Mirrors the CAS pattern in
+    // pauseRunForReportFailure and scheduler's running → report_generating.
+    if (!regenerate) {
+      const { count } = await tx.testRun.updateMany({
+        where: { id: runId, status: "report_generating" },
+        data: {
+          status: "completed",
+          completedAt: new Date(),
+          ...frozenClock,
+          terminalReason
+        }
+      });
+      if (count === 0) {
+        return { clockEvent: null, completedEvent: null };
+      }
+    }
     const report = await tx.report.upsert({
       where: { runId },
       update: {
@@ -299,15 +323,7 @@ export async function generateReportAndCompleteRun(
       where: { contentVersionId: content.id },
       data: { currentPhase: "completed" }
     });
-    const updatedRun = await tx.testRun.update({
-      where: { id: runId },
-      data: {
-        status: "completed",
-        completedAt: new Date(),
-        ...frozenClock,
-        terminalReason
-      }
-    });
+    const updatedRun = await tx.testRun.findUniqueOrThrow({ where: { id: runId } });
     const clockEvent = await recordRunClockUpdatedEvent(tx, {
       runId,
       reason: "completed",
@@ -324,6 +340,14 @@ export async function generateReportAndCompleteRun(
       }
     });
     return { clockEvent, completedEvent };
+  }).catch(async (txError) => {
+    if (!regenerate) {
+      const msg = txError instanceof Error ? txError.message : String(txError);
+      await pauseRunForReportFailure(runId, msg).catch((err) => {
+        log.error({ err, runId }, "[Report] failed to pause run after transaction error");
+      });
+    }
+    throw txError;
   });
   if (result) {
     if ("regeneratedEvent" in result && result.regeneratedEvent) {
@@ -335,6 +359,10 @@ export async function generateReportAndCompleteRun(
   }
 }
 
+// Process-level guard to prevent reentrant recovery calls (e.g. if the server
+// start hook fires twice). V1 is single-process, so this is sufficient.
+let recoveringReports = false;
+
 export async function recoverReportGenerationRuns(
   model = "mock-report-generator",
   useReal = false,
@@ -342,24 +370,30 @@ export async function recoverReportGenerationRuns(
   baseUrl?: string,
   options?: { aiTaskRunner?: AiTaskRunner; uploadDir?: string }
 ) {
-  const staleRuns = await prisma.testRun.findMany({
-    where: {
-      status: "report_generating",
-      reports: { none: {} }
-    },
-    orderBy: { updatedAt: "asc" },
-    select: { id: true }
-  });
-  if (staleRuns.length > 0) {
-    log.info({ count: staleRuns.length, runIds: staleRuns.map((r) => r.id) }, "[Report] recovering stale report_generating runs");
-  }
-  for (const run of staleRuns) {
-    void generateReportAndCompleteRun(run.id, model, useReal, apiKey, baseUrl, {
-      aiTaskRunner: options?.aiTaskRunner,
-      uploadDir: options?.uploadDir
-    }).catch((err) => {
-      log.error({ err, runId: run.id }, "[Report] failed to recover report generation");
+  if (recoveringReports) return;
+  recoveringReports = true;
+  try {
+    const staleRuns = await prisma.testRun.findMany({
+      where: {
+        status: "report_generating",
+        reports: { none: {} }
+      },
+      orderBy: { updatedAt: "asc" },
+      select: { id: true }
     });
+    if (staleRuns.length > 0) {
+      log.info({ count: staleRuns.length, runIds: staleRuns.map((r) => r.id) }, "[Report] recovering stale report_generating runs");
+    }
+    for (const run of staleRuns) {
+      void generateReportAndCompleteRun(run.id, model, useReal, apiKey, baseUrl, {
+        aiTaskRunner: options?.aiTaskRunner,
+        uploadDir: options?.uploadDir
+      }).catch((err) => {
+        log.error({ err, runId: run.id }, "[Report] failed to recover report generation");
+      });
+    }
+  } finally {
+    recoveringReports = false;
   }
 }
 

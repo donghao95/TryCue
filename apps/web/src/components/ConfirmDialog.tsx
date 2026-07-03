@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { AlertTriangle, X } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
@@ -14,6 +15,16 @@ export type ConfirmDialogProps = {
 export function ConfirmDialog({ title, body, confirmLabel, cancelLabel, tone = "primary", onConfirm, onClose }: ConfirmDialogProps) {
   const { t } = useTranslation();
   const resolvedCancelLabel = cancelLabel ?? t("common.cancel");
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        e.preventDefault();
+        onClose();
+      }
+    };
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  }, [onClose]);
   return (
     <div className="dialogOverlay" role="presentation">
       <section className={`confirmDialog confirmDialog-${tone}`} role="dialog" aria-modal="true" aria-labelledby="confirm-dialog-title">
