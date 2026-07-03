@@ -376,12 +376,13 @@ export async function generateReportAndCompleteRun(
 
 // Process-level guard: tracks the in-flight recovery promise so that a second
 // call (e.g. server start hook fires twice) does not query the same stale runs
-// and launch duplicate report generation (wasting LLM cost). The promise is
-// created synchronously after the guard check to eliminate the concurrent
-// window between guard check and assignment. We do NOT await this promise on
-// the startup path — buildApp must not block on recovered reports (a single
-// stale run with real LLM can take the model timeout, ~600s, leaving the
-// service unavailable after a crash).
+// and launch duplicate report generation (wasting LLM cost). The guard promise
+// is assigned SYNCHRONOUSLY in the same frame as the guard check — the stale-run
+// query and report generation both run INSIDE the promise body, so there is no
+// await boundary between the guard check and the assignment. We do NOT await
+// this promise on the startup path — buildApp must not block on recovered
+// reports (a single stale run with real LLM can take the model timeout, ~600s,
+// leaving the service unavailable after a crash).
 let recoveryInFlight: Promise<unknown> | null = null;
 
 export async function recoverReportGenerationRuns(
@@ -392,6 +393,26 @@ export async function recoverReportGenerationRuns(
   options?: { aiTaskRunner?: AiTaskRunner; uploadDir?: string }
 ) {
   if (recoveryInFlight) return;
+  // Assign the promise synchronously BEFORE any await. The stale-run query
+  // itself is an await boundary — if it ran before the assignment, a concurrent
+  // caller could pass the guard, read the same stale rows, and launch duplicate
+  // LLM generation. Wrapping query + generation in the promise body closes this
+  // window: the second caller sees the in-flight state immediately.
+  recoveryInFlight = recoverStaleReportGeneratingRuns(model, useReal, apiKey, baseUrl, options).finally(() => {
+    recoveryInFlight = null;
+  });
+  // Intentionally not awaited on the startup path — buildApp must not block on
+  // recovered reports. Callers that need to wait for recovery to finish should
+  // poll the DB (e.g. waitForDb in tests) rather than await this function.
+}
+
+async function recoverStaleReportGeneratingRuns(
+  model: string,
+  useReal: boolean,
+  apiKey: string | undefined,
+  baseUrl: string | undefined,
+  options: { aiTaskRunner?: AiTaskRunner; uploadDir?: string } | undefined
+) {
   const staleRuns = await prisma.testRun.findMany({
     where: {
       status: "report_generating",
@@ -402,10 +423,7 @@ export async function recoverReportGenerationRuns(
   });
   if (staleRuns.length === 0) return;
   log.info({ count: staleRuns.length, runIds: staleRuns.map((r) => r.id) }, "[Report] recovering stale report_generating runs");
-  // Synchronously create the aggregate promise and assign it to the guard
-  // variable in the same frame — no await boundary between guard check and
-  // assignment, so a concurrent caller is guaranteed to see the in-flight state.
-  recoveryInFlight = Promise.allSettled(
+  await Promise.allSettled(
     staleRuns.map((run) =>
       generateReportAndCompleteRun(run.id, model, useReal, apiKey, baseUrl, {
         aiTaskRunner: options?.aiTaskRunner,
@@ -414,12 +432,7 @@ export async function recoverReportGenerationRuns(
         log.error({ err, runId: run.id }, "[Report] failed to recover report generation");
       })
     )
-  ).finally(() => {
-    recoveryInFlight = null;
-  });
-  // Intentionally not awaited on the startup path — buildApp must not block on
-  // recovered reports. Callers that need to wait for recovery to finish should
-  // poll the DB (e.g. waitForDb in tests) rather than await this function.
+  );
 }
 
 async function pauseRunForReportFailure(runId: string, message: string) {
