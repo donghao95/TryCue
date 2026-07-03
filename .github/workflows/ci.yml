@@ -4,9 +4,23 @@ on:
   pull_request:
     branches:
       - main
+    # 纯文档/工具产物改动不触发 CI。
+    # 已确认无源代码 import/readFile 读取 .md 文件，docs 下也只有文档资源。
+    # .codex/.claude-tmp/.workbuddy 等已被 .gitignore 忽略，不会进 PR diff，无需在此重复。
+    paths-ignore:
+      - '**.md'
+      - 'docs/**'
   push:
     branches:
       - main
+    paths-ignore:
+      - '**.md'
+      - 'docs/**'
+
+# 同一分支/PR 连续 push 时取消旧的 CI run，避免排队浪费 runner 分钟
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   verify:
