@@ -384,14 +384,20 @@ export async function recoverReportGenerationRuns(
     if (staleRuns.length > 0) {
       log.info({ count: staleRuns.length, runIds: staleRuns.map((r) => r.id) }, "[Report] recovering stale report_generating runs");
     }
-    for (const run of staleRuns) {
-      void generateReportAndCompleteRun(run.id, model, useReal, apiKey, baseUrl, {
+    // Await all recovery tasks before releasing the guard. If we fire-and-forget,
+    // a second call (e.g. server start hook fires twice) would query the same
+    // stale runs (not yet completed) and launch duplicate report generation,
+    // wasting LLM cost. CAS at completion only prevents duplicate writes, not
+    // duplicate generation.
+    const recoveryPromises = staleRuns.map((run) =>
+      generateReportAndCompleteRun(run.id, model, useReal, apiKey, baseUrl, {
         aiTaskRunner: options?.aiTaskRunner,
         uploadDir: options?.uploadDir
       }).catch((err) => {
         log.error({ err, runId: run.id }, "[Report] failed to recover report generation");
-      });
-    }
+      })
+    );
+    await Promise.allSettled(recoveryPromises);
   } finally {
     recoveringReports = false;
   }
