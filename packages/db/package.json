@@ -23,12 +23,12 @@
     "db:seed-demo": "tsx src/seedDemo.ts"
   },
   "dependencies": {
-    "@prisma/client": "6.19.3",
+    "@prisma/client": "7.8.0",
     "better-sqlite3": "^11.9.1"
   },
   "devDependencies": {
     "@types/better-sqlite3": "^7.6.13",
-    "prisma": "6.19.3",
+    "prisma": "7.8.0",
     "tsx": "^4.22.4"
   },
   "prisma": {
