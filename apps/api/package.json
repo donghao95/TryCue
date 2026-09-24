@@ -30,7 +30,7 @@
     "@trycue/shared": "workspace:*",
     "ai": "^7.0.9",
     "fastify": "^5.8.5",
-    "image-size": "^2.0.2",
+    "image-size": "^2.0.3",
     "openai": "^6.45.0",
     "yaml": "^2.9.0",
     "zod": "^4.1.13"
